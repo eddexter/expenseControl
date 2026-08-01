@@ -2,7 +2,8 @@ public class CriarDespesasRecorrentesBatch implements Database.Batchable<SObject
 
     public Database.QueryLocator start(Database.BatchableContext bc) {
         return Database.getQueryLocator([
-            SELECT Id, Descricao__c, Valor__c, Dia_Vencimento__c, Categoria__c, Carteira_Padrao__c
+            SELECT Id, Descricao__c, Valor__c, Dia_Vencimento__c, Categoria__c, Carteira_Padrao__c,
+                Tipo_Pagamento__c, Variavel__c, Empresa__c
             FROM Recorrencia__c
             WHERE Ativa__c = true
         ]);
@@ -43,6 +44,9 @@ public class CriarDespesasRecorrentesBatch implements Database.Batchable<SObject
                 Status__c = 'Pendente',
                 Carteira__c = rec.Carteira_Padrao__c,
                 Categoria__c = rec.Categoria__c,
+                Tipo_Pagamento__c = rec.Tipo_Pagamento__c,
+                Variavel__c = rec.Variavel__c,
+                Empresa__c = rec.Empresa__c,
                 Recorrencia__c = rec.Id
             ));
         }

@@ -42,6 +42,10 @@ $RECYCLE.BIN/
 # Local environment variables
 .env
 
+# mcp-server Lambda build artifacts
+mcp-server/.build/
+mcp-server/dist/
+
 # Python Salesforce Functions
 **/__pycache__/
 **/.venv/

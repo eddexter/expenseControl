@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomApplication xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Despesas</label>
+    <description>Aplicativo de controle de despesas mensais, recorrências e carteiras.</description>
+    <formFactors>Large</formFactors>
+    <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
+    <isNavPersonalizationDisabled>false</isNavPersonalizationDisabled>
+    <navType>Standard</navType>
+    <tabs>Despesa__c</tabs>
+    <tabs>Recorrencia__c</tabs>
+    <tabs>Carteira__c</tabs>
+    <uiType>Lightning</uiType>
+</CustomApplication>

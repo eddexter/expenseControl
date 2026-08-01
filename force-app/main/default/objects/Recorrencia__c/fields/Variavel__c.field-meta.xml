@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Variavel__c</fullName>
+    <label>Variável</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description>Indica se o valor desta recorrência pode variar de um mês para outro (ex: cartão de crédito, conta de luz).</description>
+</CustomField>

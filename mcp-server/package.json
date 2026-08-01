@@ -1,0 +1,21 @@
+{
+  "name": "despesas-mcp-server",
+  "version": "1.0.0",
+  "description": "Servidor MCP customizado para consultar e quitar despesas no Salesforce (expenseControl) a partir de comprovantes de pagamento.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "start:http": "node src/http.js",
+    "build:lambda": "node scripts/build-lambda-zip.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "archiver": "^7.0.1"
+  }
+}
