@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CompactLayout xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>RecorrenciaCompacto</fullName>
+    <fields>Name</fields>
+    <fields>Empresa__c</fields>
+    <fields>Dia_Vencimento__c</fields>
+    <fields>Valor__c</fields>
+    <label>RecorrenciaCompacto</label>
+</CompactLayout>
