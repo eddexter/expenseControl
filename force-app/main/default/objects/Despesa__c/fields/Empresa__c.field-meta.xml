@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Empresa__c</fullName>
+    <label>Empresa</label>
+    <type>Text</type>
+    <length>120</length>
+    <required>false</required>
+    <description>Nome da empresa como costuma aparecer no recibo de pagamento, para facilitar a identificação via MCP.</description>
+</CustomField>
