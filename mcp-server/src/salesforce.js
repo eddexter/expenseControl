@@ -72,6 +72,18 @@ export async function querySOQL(soql) {
   return json.records;
 }
 
+export async function createRecord(sobject, fields) {
+  const res = await sfFetch(`/services/data/v${API_VERSION}/sobjects/${sobject}`, {
+    method: 'POST',
+    body: JSON.stringify(fields)
+  });
+  const json = await res.json();
+  if (res.status !== 201) {
+    throw new Error(`Erro ao criar ${sobject} (${res.status}): ${JSON.stringify(json)}`);
+  }
+  return json.id;
+}
+
 export async function updateRecord(sobject, id, fields) {
   const res = await sfFetch(`/services/data/v${API_VERSION}/sobjects/${sobject}/${id}`, {
     method: 'PATCH',

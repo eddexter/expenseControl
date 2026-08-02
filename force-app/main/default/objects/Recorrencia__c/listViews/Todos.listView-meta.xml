@@ -6,13 +6,11 @@
     <columns>NAME</columns>
     <columns>Descricao__c</columns>
     <columns>Valor__c</columns>
-    <columns>Categoria__c</columns>
-    <columns>Tipo_Pagamento__c</columns>
+    <columns>Tipo__c</columns>
     <columns>Empresa__c</columns>
     <columns>Variavel__c</columns>
     <columns>Carteira_Padrao__c</columns>
     <columns>Dia_Vencimento__c</columns>
-    <columns>Data_Inicio__c</columns>
-    <columns>Data_Fim__c</columns>
     <columns>Ativa__c</columns>
+    <columns>Tipo_Pagamento__c</columns>
 </ListView>

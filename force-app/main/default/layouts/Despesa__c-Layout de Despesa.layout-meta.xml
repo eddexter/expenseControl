@@ -41,7 +41,7 @@
             </layoutItems>
             <layoutItems>
                 <behavior>Edit</behavior>
-                <field>Categoria__c</field>
+                <field>Tipo__c</field>
             </layoutItems>
             <layoutItems>
                 <behavior>Edit</behavior>

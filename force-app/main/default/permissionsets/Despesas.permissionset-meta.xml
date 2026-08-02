@@ -53,11 +53,6 @@
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
-        <field>Despesa__c.Categoria__c</field>
-        <editable>true</editable>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
         <field>Despesa__c.Data_Pagamento__c</field>
         <editable>true</editable>
         <readable>true</readable>
@@ -78,6 +73,11 @@
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
+        <field>Despesa__c.Tipo__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
         <field>Despesa__c.Tipo_Pagamento__c</field>
         <editable>true</editable>
         <readable>true</readable>
@@ -92,11 +92,6 @@
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
-        <field>Recorrencia__c.Categoria__c</field>
-        <editable>true</editable>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
         <field>Recorrencia__c.Data_Fim__c</field>
         <editable>true</editable>
         <readable>true</readable>
@@ -108,6 +103,11 @@
     </fieldPermissions>
     <fieldPermissions>
         <field>Recorrencia__c.Observacoes__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Recorrencia__c.Tipo__c</field>
         <editable>true</editable>
         <readable>true</readable>
     </fieldPermissions>

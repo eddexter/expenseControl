@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customValue>
+        <fullName>Ações Sociais</fullName>
+        <default>false</default>
+        <label>Ações Sociais</label>
+    </customValue>
+    <customValue>
+        <fullName>Alimentação</fullName>
+        <default>false</default>
+        <label>Alimentação</label>
+    </customValue>
+    <customValue>
+        <fullName>Assinaturas</fullName>
+        <default>false</default>
+        <label>Assinaturas</label>
+    </customValue>
+    <customValue>
+        <fullName>Combustível</fullName>
+        <default>false</default>
+        <label>Combustível</label>
+    </customValue>
+    <customValue>
+        <fullName>Compras</fullName>
+        <default>false</default>
+        <label>Compras</label>
+    </customValue>
+    <customValue>
+        <fullName>Concessionárias</fullName>
+        <default>false</default>
+        <label>Concessionárias</label>
+    </customValue>
+    <customValue>
+        <fullName>Educação</fullName>
+        <default>false</default>
+        <label>Educação</label>
+    </customValue>
+    <customValue>
+        <fullName>Fatura de Cartão</fullName>
+        <default>false</default>
+        <label>Fatura de Cartão</label>
+    </customValue>
+    <customValue>
+        <fullName>Impostos</fullName>
+        <default>false</default>
+        <label>Impostos</label>
+    </customValue>
+    <customValue>
+        <fullName>Investimentos</fullName>
+        <default>false</default>
+        <label>Investimentos</label>
+    </customValue>
+    <customValue>
+        <fullName>Lazer</fullName>
+        <default>false</default>
+        <label>Lazer</label>
+    </customValue>
+    <customValue>
+        <fullName>Moradia</fullName>
+        <default>false</default>
+        <label>Moradia</label>
+    </customValue>
+    <customValue>
+        <fullName>Saúde</fullName>
+        <default>false</default>
+        <label>Saúde</label>
+    </customValue>
+    <customValue>
+        <fullName>Transporte</fullName>
+        <default>false</default>
+        <label>Transporte</label>
+    </customValue>
+    <customValue>
+        <fullName>Outros</fullName>
+        <default>false</default>
+        <label>Outros</label>
+    </customValue>
+    <masterLabel>Tipo de Despesa</masterLabel>
+    <sorted>false</sorted>
+</GlobalValueSet>

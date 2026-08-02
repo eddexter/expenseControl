@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { querySOQL, updateRecord } from './salesforce.js';
+import { querySOQL, updateRecord, createRecord } from './salesforce.js';
 import { scoreCandidate } from './matching.js';
 
 const DESPESA_FIELDS = [
@@ -12,12 +12,13 @@ const DESPESA_FIELDS = [
   'Data_Vencimento__c',
   'Data_Pagamento__c',
   'Carteira__c',
-  'Categoria__c',
   'Tipo_Pagamento__c',
   'Empresa__c',
   'Variavel__c',
   'Recorrencia__c'
 ].join(', ');
+
+const TIPOS_PAGAMENTO_QUITACAO_CONFIRMACAO = ['Débito Automático', 'Cartão de Crédito'];
 
 function soqlEscape(value) {
   return String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -130,18 +131,19 @@ export function createServer() {
       description:
         'Marca uma Despesa__c como Paga (Status__c = Pago) e registra Data_Pagamento__c. ' +
         'Se valorPago for informado e a despesa NÃO for variável, o valor deve bater com Valor__c (pequenas diferenças de arredondamento são toleradas); divergências maiores exigem forcar = true. ' +
-        'Se a despesa já não estiver Pendente, também exige forcar = true.',
+        'Se a despesa já não estiver Pendente, também exige forcar = true. ' +
+        'Se Tipo_Pagamento__c for Débito Automático ou Cartão de Crédito, a baixa é tipicamente automática por outro mecanismo — confirme com o usuário antes de quitar manualmente; passe forcar = true só após essa confirmação.',
       inputSchema: {
         despesaId: z.string().describe('Id do registro Despesa__c a ser quitado'),
         dataPagamento: z.string().describe('Data em que o pagamento foi efetuado, no formato YYYY-MM-DD'),
         valorPago: z.number().optional().describe('Valor efetivamente pago, se diferente do valor cadastrado'),
-        forcar: z.boolean().optional().describe('Ignora as validações de segurança (status atual e divergência de valor)')
+        forcar: z.boolean().optional().describe('Ignora as validações de segurança (status atual, divergência de valor e tipo de pagamento Débito Automático/Cartão de Crédito)')
       }
     },
     async ({ despesaId, dataPagamento, valorPago, forcar }) => {
       try {
         const [despesa] = await querySOQL(
-          `SELECT Id, Status__c, Variavel__c, Valor__c, Empresa__c, Descricao__c FROM Despesa__c WHERE Id = '${soqlEscape(despesaId)}' LIMIT 1`
+          `SELECT Id, Status__c, Variavel__c, Valor__c, Empresa__c, Descricao__c, Tipo_Pagamento__c FROM Despesa__c WHERE Id = '${soqlEscape(despesaId)}' LIMIT 1`
         );
 
         if (!despesa) {
@@ -151,6 +153,12 @@ export function createServer() {
         if (despesa.Status__c !== 'Pendente' && !forcar) {
           return errorResult(
             `Despesa ${despesa.Id} (${despesa.Descricao__c}) está com Status__c = '${despesa.Status__c}', não 'Pendente'. Passe forcar = true para quitar mesmo assim.`
+          );
+        }
+
+        if (TIPOS_PAGAMENTO_QUITACAO_CONFIRMACAO.includes(despesa.Tipo_Pagamento__c) && !forcar) {
+          return errorResult(
+            `Despesa ${despesa.Id} (${despesa.Descricao__c}) tem Tipo_Pagamento__c = '${despesa.Tipo_Pagamento__c}'. Confirme com o usuário se essa despesa deve mesmo ser quitada manualmente antes de prosseguir, e passe forcar = true para efetivar.`
           );
         }
 
@@ -176,6 +184,100 @@ export function createServer() {
           empresa: despesa.Empresa__c,
           descricao: despesa.Descricao__c,
           camposAtualizados: fields
+        });
+      } catch (err) {
+        return errorResult(err.message);
+      }
+    }
+  );
+
+  server.registerTool(
+    'buscar_carteiras',
+    {
+      title: 'Buscar carteiras',
+      description:
+        'Lista as Carteira__c cadastradas (Id, Name, Tipo__c, Instituicao__c, Ativa__c). Use para resolver o carteiraId a partir do nome do cartão/conta mencionado no comprovante ou pelo usuário, antes de chamar criar_despesa. ' +
+        "Ao montar uma Despesa__c a partir de um comprovante de Débito ou Pix, filtre tipo = 'Conta Corrente' e pergunte ao usuário qual conta corrente cadastrada corresponde. Para um comprovante de Cartão de Crédito, filtre tipo = 'Cartão de Crédito' e pergunte qual cartão cadastrado corresponde.",
+      inputSchema: {
+        nome: z.string().optional().describe('Filtro parcial (LIKE) pelo Name da carteira'),
+        tipo: z
+          .string()
+          .optional()
+          .describe(
+            "Filtro exato pelo Tipo__c da carteira (Conta Corrente, Poupança, Cartão de Crédito, Dinheiro em Espécie, Investimento, Outro). Use 'Conta Corrente' para comprovantes de Débito/Pix e 'Cartão de Crédito' para comprovantes de Cartão de Crédito."
+          ),
+        apenasAtivas: z.boolean().optional().describe('Se true (padrão), traz só carteiras com Ativa__c = true')
+      }
+    },
+    async ({ nome, tipo, apenasAtivas }) => {
+      try {
+        const condicoes = [];
+        if (apenasAtivas !== false) {
+          condicoes.push('Ativa__c = true');
+        }
+        if (nome) {
+          condicoes.push(`Name LIKE '%${soqlEscape(nome)}%'`);
+        }
+        if (tipo) {
+          condicoes.push(`Tipo__c = '${soqlEscape(tipo)}'`);
+        }
+        const where = condicoes.length ? ` WHERE ${condicoes.join(' AND ')}` : '';
+        const soql = `SELECT Id, Name, Tipo__c, Instituicao__c, Ativa__c FROM Carteira__c${where} ORDER BY Name ASC LIMIT 200`;
+        const carteiras = await querySOQL(soql);
+        return textResult({ total: carteiras.length, carteiras });
+      } catch (err) {
+        return errorResult(err.message);
+      }
+    }
+  );
+
+  server.registerTool(
+    'criar_despesa',
+    {
+      title: 'Criar despesa avulsa a partir de um comprovante',
+      description:
+        'Cria uma Despesa__c avulsa (não vinculada a nenhuma Recorrencia__c) a partir de um comprovante de pagamento já efetuado — foto de nota/recibo, ou comprovante de transação por aproximação/NFC no celular. ' +
+        'A despesa é criada diretamente com Status__c = Pago e Data_Pagamento__c = dataPagamento, já que o comprovante prova que o pagamento já ocorreu. ' +
+        'Antes de usar esta ferramenta, chame identificar_despesa_por_comprovante para conferir se o comprovante não corresponde a uma despesa pendente já existente (ex: gerada por uma recorrência) — só crie uma despesa nova quando não houver correspondência razoável. ' +
+        'carteiraId NUNCA deve ser adivinhado: se o comprovante for de Débito ou Pix, chame buscar_carteiras com tipo = "Conta Corrente" e pergunte ao usuário qual conta corrente cadastrada usar; se for de Cartão de Crédito, chame buscar_carteiras com tipo = "Cartão de Crédito" e pergunte qual cartão cadastrado usar — mesmo havendo só uma opção, confirme com o usuário antes de criar a despesa.',
+      inputSchema: {
+        descricao: z.string().describe('Descrição da despesa'),
+        valor: z.number().describe('Valor pago, conforme o comprovante'),
+        carteiraId: z.string().describe('Id da Carteira__c usada no pagamento (veja buscar_carteiras)'),
+        dataPagamento: z.string().describe('Data em que o pagamento foi efetuado, no formato YYYY-MM-DD'),
+        dataVencimento: z
+          .string()
+          .optional()
+          .describe('Data de vencimento no formato YYYY-MM-DD; se omitida, usa a própria dataPagamento'),
+        tipo: z.string().optional().describe('Tipo__c (Global Value Set Tipo_Despesa), ex: Alimentação, Combustível, Compras'),
+        tipoPagamento: z.string().optional().describe('Tipo_Pagamento__c: Boleto, Débito Automático, Pix ou Cartão de Crédito'),
+        empresa: z.string().optional().describe('Nome da empresa/beneficiário como aparece no comprovante'),
+        observacoes: z.string().optional().describe('Observações livres sobre a despesa'),
+        variavel: z.boolean().optional().describe('Variavel__c — se o valor costuma variar (padrão false)')
+      }
+    },
+    async ({ descricao, valor, carteiraId, dataPagamento, dataVencimento, tipo, tipoPagamento, empresa, observacoes, variavel }) => {
+      try {
+        const fields = {
+          Descricao__c: descricao,
+          Valor__c: valor,
+          Carteira__c: carteiraId,
+          Status__c: 'Pago',
+          Data_Pagamento__c: dataPagamento,
+          Data_Vencimento__c: dataVencimento || dataPagamento
+        };
+        if (tipo) fields.Tipo__c = tipo;
+        if (tipoPagamento) fields.Tipo_Pagamento__c = tipoPagamento;
+        if (empresa) fields.Empresa__c = empresa;
+        if (observacoes) fields.Observacoes__c = observacoes;
+        if (variavel != null) fields.Variavel__c = variavel;
+
+        const despesaId = await createRecord('Despesa__c', fields);
+
+        return textResult({
+          sucesso: true,
+          despesaId,
+          camposCriados: fields
         });
       } catch (err) {
         return errorResult(err.message);

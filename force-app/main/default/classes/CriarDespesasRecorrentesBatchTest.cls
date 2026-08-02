@@ -12,7 +12,6 @@ private class CriarDespesasRecorrentesBatchTest {
             Dia_Vencimento__c = 31,
             Data_Inicio__c = Date.today().addMonths(-6),
             Carteira_Padrao__c = carteira.Id,
-            Categoria__c = 'Moradia',
             Tipo_Pagamento__c = 'Débito Automático',
             Variavel__c = false,
             Empresa__c = 'Imobiliaria XPTO'
@@ -23,8 +22,7 @@ private class CriarDespesasRecorrentesBatchTest {
             Dia_Vencimento__c = 10,
             Data_Inicio__c = Date.today().addMonths(-12),
             Data_Fim__c = Date.today().addMonths(-1),
-            Carteira_Padrao__c = carteira.Id,
-            Categoria__c = 'Assinaturas'
+            Carteira_Padrao__c = carteira.Id
         );
         insert new List<Recorrencia__c>{ recorrenciaAtiva, recorrenciaInativa };
     }

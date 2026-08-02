@@ -36,7 +36,7 @@ Modelo de uma despesa que se repete mensalmente (ex: aluguel, assinaturas). O ba
 | Data_Fim__c | Date | Não | Fim da vigência (em branco = sem data de término) |
 | Ativa__c | Checkbox (fórmula) | — | `Data_Inicio__c <= HOJE() && (Data_Fim__c em branco OU Data_Fim__c >= HOJE())` |
 | Carteira_Padrao__c | Lookup(Carteira__c) | Sim | Carteira usada por padrão ao gerar a despesa |
-| Categoria__c | Picklist | Não | Moradia, Transporte, Alimentação, Lazer, Assinaturas, Saúde, Educação, Outros |
+| Tipo__c | Picklist (Global Value Set `Tipo_Despesa`) | Não | Ações Sociais, Alimentação, Assinaturas, Combustível, Compras, Concessionárias, Educação, Fatura de Cartão, Impostos, Investimentos, Lazer, Moradia, Saúde, Transporte, Outros |
 | Tipo_Pagamento__c | Picklist | Não | Boleto, Débito Automático, Pix, Cartão de Crédito |
 | Variavel__c | Checkbox | — | Default `false`. Indica se o valor pode variar de um mês para outro (ex: cartão de crédito, conta de luz) |
 | Empresa__c | Text(120) | Não | Nome da empresa como aparece no recibo/comprovante, para facilitar identificação via MCP |
@@ -56,7 +56,7 @@ Lançamento mensal de uma despesa, gerado automaticamente a partir de uma recorr
 | Status__c | Picklist | Sim | Pendente (default), Pago, Cancelado |
 | Carteira__c | Lookup(Carteira__c) | Sim | Carteira usada no pagamento |
 | Recorrencia__c | Lookup(Recorrencia__c) | Não | Recorrência de origem, quando aplicável |
-| Categoria__c | Picklist | Não | Mesmos valores de Recorrencia__c.Categoria__c |
+| Tipo__c | Picklist (Global Value Set `Tipo_Despesa`) | Não | Mesmos valores de Recorrencia__c.Tipo__c |
 | Tipo_Pagamento__c | Picklist | Não | Boleto, Débito Automático, Pix, Cartão de Crédito |
 | Variavel__c | Checkbox | — | Default `false`. Indica se o valor pode variar de um mês para outro |
 | Empresa__c | Text(120) | Não | Nome da empresa como aparece no recibo/comprovante, para facilitar identificação e quitação via MCP |
@@ -71,7 +71,7 @@ Classe `Database.Batchable` + `Schedulable` que gera as despesas do mês corrent
 - Seleciona todas as `Recorrencia__c` com `Ativa__c = true`.
 - Calcula a data de vencimento do mês (ajustando `Dia_Vencimento__c` para o último dia do mês quando necessário).
 - É idempotente: não cria uma nova despesa se já existir uma `Despesa__c` para aquela recorrência no mês corrente.
-- Copia `Descricao__c`, `Valor__c`, `Carteira_Padrao__c`, `Categoria__c`, `Tipo_Pagamento__c`, `Variavel__c` e `Empresa__c` da recorrência para a despesa criada.
+- Copia `Descricao__c`, `Valor__c`, `Carteira_Padrao__c`, `Tipo__c`, `Tipo_Pagamento__c`, `Variavel__c` e `Empresa__c` da recorrência para a despesa criada.
 - Testes em `CriarDespesasRecorrentesBatchTest` cobrem: criação para recorrência ativa, não duplicação ao rodar o batch duas vezes no mesmo mês, e não criação para recorrência inativa.
 
 ## Abas
@@ -84,8 +84,8 @@ Classe `Database.Batchable` + `Schedulable` que gera as despesas do mês corrent
 Cada objeto tem uma list view `Todos` (`filterScope: Everything`, sem filtros — mostra todos os registros), com as colunas relevantes (campos `LongTextArea` como `Observacoes__c` ficam de fora por não serem suportados como coluna de list view):
 
 - **Carteira__c**: Name, Tipo__c, Instituicao__c, Ativa__c
-- **Recorrencia__c**: Name, Descricao__c, Valor__c, Categoria__c, Tipo_Pagamento__c, Empresa__c, Variavel__c, Carteira_Padrao__c, Dia_Vencimento__c, Data_Inicio__c, Data_Fim__c, Ativa__c
-- **Despesa__c**: Name, Descricao__c, Valor__c, Status__c, Data_Vencimento__c, Data_Pagamento__c, Carteira__c, Categoria__c, Tipo_Pagamento__c, Empresa__c, Variavel__c, Recorrencia__c
+- **Recorrencia__c**: Name, Descricao__c, Valor__c, Tipo__c, Empresa__c, Variavel__c, Carteira_Padrao__c, Dia_Vencimento__c, Ativa__c, Tipo_Pagamento__c
+- **Despesa__c**: Name, Descricao__c, Valor__c, Tipo__c, Status__c, Data_Vencimento__c, Data_Pagamento__c, Carteira__c, Tipo_Pagamento__c
 
 A list view nativa "Recent" (Mais Recentes) **não é gerenciável via Metadata API** (não é retornada por `list metadata`, nem por retrieve explícito, para nenhum objeto padrão ou customizado) — não é possível versioná-la ou definir suas colunas via pacote. Decisão: não mexer nela; `Todos` é a visão principal usada no app.
 
@@ -96,8 +96,8 @@ Cada objeto customizado já vem com um layout padrão gerado automaticamente pel
 Nos 3 objetos, o layout que criamos via deploy (`Carteira Layout`, `Despesa Layout`, `Recorrência Layout`) foi **apagado na org** (editado/removido diretamente no Setup) — só sobrou o layout padrão do sistema (`Layout de Carteira`, `Layout de Despesa`, `Layout de Recorrência`), que passou a ser editado à mão por lá. Os arquivos locais órfãos somem sozinhos num próximo `sf project retrieve` (source tracking do scratch org reconcilia a exclusão).
 
 Os 3 layouts de sistema (`Layout de Carteira`, `Layout de Despesa`, `Layout de Recorrência`) foram completados com todos os campos que faltavam, na seção "Information" já existente (junto de `OwnerId`):
-- `Despesa__c-Layout de Despesa`: adicionados `Categoria__c`, `Tipo_Pagamento__c`, `Variavel__c`, `Empresa__c`, `Data_Pagamento__c`, `Recorrencia__c`, `Observacoes__c`.
-- `Recorrencia__c-Layout de Recorrência`: adicionados `Ativa__c` (readonly, é fórmula), `Categoria__c`, `Tipo_Pagamento__c`, `Variavel__c`, `Empresa__c`, `Data_Fim__c`, `Observacoes__c`.
+- `Despesa__c-Layout de Despesa`: adicionados `Categoria__c` (removido depois), `Tipo_Pagamento__c`, `Variavel__c`, `Empresa__c`, `Data_Pagamento__c`, `Recorrencia__c`, `Observacoes__c`. Depois, `Tipo__c`.
+- `Recorrencia__c-Layout de Recorrência`: adicionados `Ativa__c` (readonly, é fórmula), `Categoria__c` (removido depois), `Tipo_Pagamento__c`, `Variavel__c`, `Empresa__c`, `Data_Fim__c`, `Observacoes__c`. Depois, `Tipo__c`.
 - `Carteira__c-Layout de Carteira`: adicionados `Instituicao__c`, `Ativa__c`, `Observacoes__c`.
 
 ## Lightning Record Pages
@@ -133,7 +133,7 @@ Concede tudo que é necessário para atuar no app:
 
 O MCP oficial da Salesforce (`@salesforce/mcp`) só expõe leitura (`run_soql_query`) — sem DML. Como o objetivo é o Claude **identificar e quitar** despesas a partir de um comprovante de pagamento, construímos um servidor MCP próprio em `mcp-server/` (Node.js).
 
-**Escopo**: o fluxo cobre pagamentos manuais conferidos por comprovante — Boleto, Pix, Cartão de Crédito. Despesas com `Tipo_Pagamento__c = 'Débito Automático'` **não** passam por esse matching: a baixa delas é automática (outro mecanismo, ainda não construído), então elas ficam de fora do fluxo de conciliação por comprovante.
+**Escopo**: `buscar_despesas_pendentes` e `identificar_despesa_por_comprovante` não filtram por `Tipo_Pagamento__c` — trazem/comparam despesas pendentes de qualquer tipo de pagamento (o tipo só entra como sinal de pontuação no matching). Já `quitar_despesa` exige confirmação explícita do usuário (`forcar = true`) antes de quitar uma despesa com `Tipo_Pagamento__c = 'Débito Automático'` ou `'Cartão de Crédito'`, já que a baixa desses tipos costuma ser automática por outro mecanismo (ainda não construído) — quitar manualmente sem confirmar arrisca duplicar a baixa.
 
 ### Autenticação — Connected App `Despesas MCP`
 
@@ -151,7 +151,9 @@ Registrado no Claude Code via `.mcp.json` na raiz do projeto (`despesas-salesfor
 
 - `buscar_despesas_pendentes` — lista `Despesa__c` com `Status__c = 'Pendente'`, com filtros opcionais de mês, empresa e carteira.
 - `identificar_despesa_por_comprovante` — recebe os dados extraídos de um comprovante (empresa, descrição, valor, data, tipo de pagamento) e retorna os candidatos entre as despesas pendentes, ordenados por pontuação de confiança (`mcp-server/src/matching.js`).
-- `quitar_despesa` — atualiza `Status__c = 'Pago'` e `Data_Pagamento__c`; opcionalmente ajusta `Valor__c`. Recusa (a menos que `forcar = true`) quando a despesa já não está `Pendente`, ou quando o valor pago diverge do cadastrado numa despesa **não variável**.
+- `quitar_despesa` — atualiza `Status__c = 'Pago'` e `Data_Pagamento__c`; opcionalmente ajusta `Valor__c`. Recusa (a menos que `forcar = true`) quando a despesa já não está `Pendente`, quando o valor pago diverge do cadastrado numa despesa **não variável**, ou quando `Tipo_Pagamento__c` é `Débito Automático`/`Cartão de Crédito` (pede confirmação do usuário antes de quitar manualmente).
+- `buscar_carteiras` — lista `Carteira__c` (Id, Name, Tipo__c, Instituicao__c, Ativa__c), com filtros opcionais de nome e `Tipo__c`. Usada para resolver `carteiraId` ao criar uma despesa avulsa.
+- `criar_despesa` — cria uma `Despesa__c` avulsa (sem `Recorrencia__c`) a partir de um comprovante de pagamento já efetuado (foto de nota/recibo ou comprovante de transação por aproximação/NFC no celular), já com `Status__c = 'Pago'` e `Data_Pagamento__c` preenchidos. Antes de criar, o Claude deve chamar `identificar_despesa_por_comprovante` para descartar que o comprovante seja de uma despesa pendente já existente. `carteiraId` nunca é adivinhado: para comprovante de Débito/Pix, o Claude busca carteiras com `Tipo__c = 'Conta Corrente'` e pergunta ao usuário qual usar; para Cartão de Crédito, busca `Tipo__c = 'Cartão de Crédito'` e pergunta qual cartão cadastrado usar — mesmo havendo só uma opção.
 
 **Heurística de matching** (`scoreCandidate`, 0–100):
 
@@ -205,7 +207,7 @@ aws iam attach-role-policy --role-name despesas-mcp-lambda-role \
 # 4. Criar a função (layer da Web Adapter — ARN varia por região, confirme a versão atual)
 aws lambda create-function \
   --region <region> --function-name despesas-mcp-server \
-  --runtime nodejs20.x --handler run.sh \
+  --runtime nodejs22.x --handler run.sh \
   --role arn:aws:iam::<account-id>:role/despesas-mcp-lambda-role \
   --layers arn:aws:lambda:<region>:753240598075:layer:LambdaAdapterLayerX86:28 \
   --timeout 30 --memory-size 512 --zip-file fileb://dist/function.zip \
@@ -240,6 +242,13 @@ sf apex run test --target-org <alias> --class-names CriarDespesasRecorrentesBatc
 
 ## Histórico de mudanças
 
+- **2026-08-02** — Atualizado o runtime da Lambda `despesas-mcp-server` de `nodejs20.x` para `nodejs22.x`, em resposta ao aviso da AWS de fim de suporte do Node.js 20.x no Lambda (30/abr/2026). Só a configuração do runtime foi trocada (`aws lambda update-function-configuration --runtime nodejs22.x`) — o layer da Lambda Web Adapter não depende da versão do Node, então não precisou de ajuste. Testado ao vivo após a troca: `tools/list` no endpoint `/mcp` respondeu 200 com as 5 ferramentas.
+- **2026-08-02** — Adicionadas as ferramentas `buscar_carteiras` e `criar_despesa` ao `mcp-server`, para registrar despesas avulsas (não vinculadas a nenhuma `Recorrencia__c`) a partir de um comprovante de pagamento já efetuado — foto de nota/recibo ou comprovante de transação por aproximação/NFC no celular. `criar_despesa` cria a `Despesa__c` diretamente com `Status__c = 'Pago'`; a descrição da ferramenta instrui o Claude a chamar `identificar_despesa_por_comprovante` antes, para não duplicar uma despesa pendente já existente, e a nunca adivinhar `carteiraId` — para comprovante de Débito/Pix, pergunta ao usuário qual Conta Corrente cadastrada usar (via `buscar_carteiras` com `tipo = 'Conta Corrente'`); para Cartão de Crédito, pergunta qual cartão cadastrado usar (`tipo = 'Cartão de Crédito'`). Adicionado `createRecord` em `mcp-server/src/salesforce.js` (POST em `/sobjects/{sobject}`, reaproveitando a mesma autenticação client credentials). Redeploy feito na Lambda `despesas-mcp-server`.
+- **2026-08-02** — Removidas as colunas `Empresa__c`, `Variavel__c` e `Recorrencia__c` da list view `Todos` de `Despesa__c`. Deploy feito na org `financeiro-dev`.
+- **2026-08-02** — Removidas as colunas `Data_Inicio__c` e `Data_Fim__c` da list view `Todos` de `Recorrencia__c`. Deploy feito na org `financeiro-dev`.
+- **2026-08-02** — Reordenadas as colunas da list view `Todos` em `Recorrencia__c` e `Despesa__c`: `Tipo__c` adicionado logo após `Valor__c`, e `Tipo_Pagamento__c` movido para o final. Deploy feito na org `financeiro-dev`.
+- **2026-08-02** — Adicionados os valores `Concessionárias`, `Fatura de Cartão` e `Ações Sociais` ao Global Value Set `Tipo_Despesa`. `Ações Sociais` foi escolhido (entre outras opções: Doações, Doações e Caridade, Solidariedade) para cobrir doações e contribuições sociais em geral. Deploy feito na org `financeiro-dev`.
+- **2026-08-02** — Removido o campo `Categoria__c` de `Recorrencia__c` e `Despesa__c` (substituído por `Tipo__c`/Global Value Set `Tipo_Despesa`): campo deletado dos dois objetos, removido dos layouts (`Layout de Despesa`, `Layout de Recorrência`), do Permission Set `Despesas` (FLS), das list views `Todos` dos dois objetos, da query/atribuição do batch `CriarDespesasRecorrentesBatch`, da massa de teste em `CriarDespesasRecorrentesBatchTest`, e da lista de campos consultados pelo `mcp-server` (`DESPESA_FIELDS` em `src/server.js`). Não estava presente nas Lightning Record Pages (Dynamic Forms nunca incluiu esse campo). Deploy feito na org `financeiro-dev`, testes de `CriarDespesasRecorrentesBatchTest` passando.
 - **2026-08-01** — Scaffold inicial do projeto SFDX: objetos `Carteira__c`, `Recorrencia__c`, `Despesa__c`, batch `CriarDespesasRecorrentesBatch` (+ teste), abas e perfil Admin.
 - **2026-08-01** — Adicionados os campos `Tipo_Pagamento__c`, `Variavel__c` e `Empresa__c` em `Recorrencia__c` e `Despesa__c`, para apoiar identificação e quitação de registros via MCP. Batch atualizado para propagar esses campos da recorrência para a despesa gerada.
 - **2026-08-01** — Criado o Lightning App `Despesas` (abas Despesas, Recorrências, Carteira, nessa ordem) e o Permission Set `Despesas` com CRUD completo nos 3 objetos, FLS nos campos customizados, abas e acesso ao aplicativo.
@@ -255,4 +264,6 @@ sf apex run test --target-org <alias> --class-names CriarDespesasRecorrentesBatc
 - **2026-08-02** — Retrieve de `Despesa__c`: compact layout `DespesaCompacto` (`Name`, `Empresa__c`, `Data_Vencimento__c`, `Status__c`, `Valor__c`) e sua atribuição, `Despesa_Record_Page` editada no App Builder para Dynamic Forms (mesmo padrão do `Recorrencia_Record_Page`), e o Page Layout realmente em uso. Descoberto no processo: o `Despesa Layout`/`Recorrência Layout` que criamos via deploy **nunca foram, de fato, os layouts exibidos** — cada objeto customizado já vem com um layout padrão gerado pelo próprio Salesforce na criação (`Layout de Despesa`, `Layout de Recorrência`, `Layout de Carteira`), e um `Layout` novo via metadata não vira default automaticamente sem atribuição por perfil. O usuário passou a editar esses layouts de sistema diretamente no Setup; os nossos ficaram órfãos e foram apagados na org — o `sf project retrieve start` seguinte removeu sozinho os arquivos locais correspondentes (source tracking do scratch org). `Layout de Despesa` retrieved tem só 6 campos (falta `Categoria__c`, `Data_Pagamento__c`, `Empresa__c`, `Observacoes__c`, `Recorrencia__c`, `Tipo_Pagamento__c`, `Variavel__c`) — completado no changelog seguinte. Na época deste retrieve, `Carteira__c` ainda tinha os dois layouts (sistema + o nosso) coexistindo na org; o nosso foi apagado depois, mesmo padrão dos outros dois objetos.
 - **2026-08-02** — Retrieved também `Layout de Recorrência` e `Layout de Carteira` (os layouts de sistema reais de cada objeto) e completados os campos faltantes nos 3 (`Layout de Despesa`, `Layout de Recorrência`, `Layout de Carteira`), adicionando-os à seção "Information" já existente junto de `OwnerId`. Deploy feito na org `financeiro-dev`.
 - **2026-08-02** — Retrieve de `Carteira__c`: compact layout `CarteiraCompacto` (`Name`, `Ativa__c`, `Tipo__c`, `Instituicao__c`) e sua atribuição, e `Carteira_Record_Page` editada no App Builder (mesmo padrão de migração para Dynamic Forms que `Despesa_Record_Page`/`Recorrencia_Record_Page`). Limpeza do boilerplate do retrieve completo do `CustomObject` seguindo o mesmo padrão já estabelecido.
+- **2026-08-02** — `quitar_despesa` passou a exigir confirmação (`forcar = true`) antes de quitar uma despesa com `Tipo_Pagamento__c = 'Débito Automático'` ou `'Cartão de Crédito'`, já que a baixa desses tipos costuma ocorrer por outro mecanismo automático. No processo, corrigida a documentação do escopo do MCP, que descrevia um filtro por tipo de pagamento em `buscar_despesas_pendentes`/`identificar_despesa_por_comprovante` que nunca existiu no código — essas duas ferramentas continuam sem filtrar por `Tipo_Pagamento__c`.
+- **2026-08-02** — Criado o Global Value Set `Tipo_Despesa` (Alimentação, Assinaturas, Combustível, Compras, Educação, Impostos, Investimentos, Lazer, Moradia, Saúde, Transporte, Outros) e o campo picklist `Tipo__c` em `Recorrencia__c` e `Despesa__c` referenciando esse value set. Batch `CriarDespesasRecorrentesBatch` atualizado para copiar `Tipo__c` da recorrência para a despesa gerada. Campo adicionado aos layouts de sistema (`Layout de Despesa`, `Layout de Recorrência`), às Lightning Record Pages (Dynamic Forms) e ao Permission Set `Despesas` (FLS). Deploy feito na org `financeiro-dev`, testes de `CriarDespesasRecorrentesBatchTest` passando.
 - **2026-08-01** — Trocado o Bearer token fixo por **OAuth 2.1 completo** (`mcp-server/src/oauth.js`) em `/mcp`: o Claude.ai recusou a conexão pedindo OAuth de verdade. Reaproveitado o `OAuthServerProvider`/`mcpAuthRouter` que o `@modelcontextprotocol/sdk` já traz (discovery RFC 8414/9728, registro dinâmico RFC 7591, PKCE) — só foi implementada a peça específica: login de usuário único, com o `MCP_AUTH_TOKEN` como senha num formulário HTML servido em `/authorize`. Sem banco de dados: clients/códigos/tokens são blobs auto-assinados por HMAC (stateless, compatível com Lambda entre invocações frias), com a troca de não dar pra revogar um token antes de expirar — aceitável para uso pessoal com TTLs curtos. Corrigido um bug encontrado no processo: token inválido em `/mcp` devolvia 500 em vez de 401 (faltava usar as classes de erro do SDK — `InvalidTokenError`/`InvalidGrantError` — em vez de `Error` genérico). Testado ponta a ponta na Lambda real simulando o `redirect_uri` do Claude.ai: registro de client, formulário de login, troca de código por token, `tools/list` autenticado. Descoberto: a Function URL da AWS renomeia o header `WWW-Authenticate` para `x-amzn-Remapped-www-authenticate` (não documentado) — pode afetar a descoberta automática do Claude.ai; se afetar, o fallback é a descoberta via `/.well-known/oauth-authorization-server` direto na URL base, que funciona. Build do zip formalizado em `mcp-server/scripts/build-lambda-zip.mjs` (`npm run build:lambda`, usa `archiver` como devDependency). Depois desse teste, um segundo bug apareceu: qualquer requisição com token inválido derrubava a Lambda com 502 (`Extension.Crash` nos logs — a Lambda Web Adapter, em Rust, quebra ao serializar um header HTTP com acento UTF-8; o `error_description` "Token **invá**lido..." ia para o header `WWW-Authenticate`). Corrigido removendo acentos de toda mensagem de erro OAuth (headers HTTP não são seguros para UTF-8 bruto). De quebra, também corrigido um warning de `express-rate-limit` sobre `X-Forwarded-For` sem `trust proxy` configurado (`app.set('trust proxy', 1)` — a Web Adapter atua como proxy reverso). Reconfirmado ponta a ponta na Lambda após as correções (login errado → 401, fluxo completo → 200, logs limpos). Passo pendente: validar visualmente o cadastro do conector na UI do Claude.ai.
