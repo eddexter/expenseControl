@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Atrasados</fullName>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>Status__c</field>
+        <operation>equals</operation>
+        <value>Pendente</value>
+    </filters>
+    <filters>
+        <field>Data_Vencimento__c</field>
+        <operation>lessThan</operation>
+        <value>TODAY</value>
+    </filters>
+    <label>Atrasados</label>
+    <columns>NAME</columns>
+    <columns>Descricao__c</columns>
+    <columns>Valor__c</columns>
+    <columns>Tipo__c</columns>
+    <columns>Status__c</columns>
+    <columns>Data_Vencimento__c</columns>
+    <columns>Carteira__c</columns>
+    <columns>Tipo_Pagamento__c</columns>
+</ListView>
