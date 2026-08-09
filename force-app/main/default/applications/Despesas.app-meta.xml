@@ -24,6 +24,7 @@
     <label>Despesas</label>
     <description>Aplicativo de controle de despesas mensais, recorrências e carteiras.</description>
     <formFactors>Large</formFactors>
+    <formFactors>Small</formFactors>
     <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
     <isNavPersonalizationDisabled>false</isNavPersonalizationDisabled>
     <navType>Standard</navType>

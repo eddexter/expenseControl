@@ -73,6 +73,19 @@ Classe `Database.Batchable` + `Schedulable` que gera as despesas do mês corrent
 - É idempotente: não cria uma nova despesa se já existir uma `Despesa__c` para aquela recorrência no mês corrente.
 - Copia `Descricao__c`, `Valor__c`, `Carteira_Padrao__c`, `Tipo__c`, `Tipo_Pagamento__c`, `Variavel__c` e `Empresa__c` da recorrência para a despesa criada.
 - Testes em `CriarDespesasRecorrentesBatchTest` cobrem: criação para recorrência ativa, não duplicação ao rodar o batch duas vezes no mesmo mês, e não criação para recorrência inativa.
+- `scripts/apex/schedule-batch.apex`: setup único, agenda o batch via `System.schedule` (dia 1 de cada mês, 01:00).
+- `scripts/apex/run-batch.apex`: executa o batch imediatamente via `Database.executeBatch`, sem agendar — útil para rodar sob demanda (`sf apex run --file scripts/apex/run-batch.apex --target-org <alias>`).
+
+### QuitarDespesasDebitoCartaoBatch
+
+Classe `Database.Batchable` + `Schedulable` que quita automaticamente as despesas de `Débito Automático`/`Cartão de Crédito` no dia do vencimento.
+
+- Seleciona `Despesa__c` com `Status__c = 'Pendente'`, `Data_Vencimento__c = TODAY` e `Tipo_Pagamento__c` em `Débito Automático` ou `Cartão de Crédito`.
+- Atualiza `Status__c = 'Pago'` e `Data_Pagamento__c = hoje`. Não mexe em despesas já `Pago`/`Cancelado` nem em outros tipos de pagamento.
+- É o mecanismo automático de baixa desses dois tipos de pagamento mencionado no MCP (`quitar_despesa` pede confirmação manual para eles justamente por causa dessa baixa automática).
+- Testes em `QuitarDespesasDebitoCartaoBatchTest` cobrem: quitação de Débito Automático e Cartão de Crédito vencendo hoje, não quitação de outros tipos de pagamento, não quitação de vencimento futuro, e não alteração de despesa já paga.
+- `scripts/apex/schedule-quitar-debito-cartao.apex`: setup único, agenda o batch via `System.schedule` (todo dia às 6h, horário padrão da org).
+- `scripts/apex/run-quitar-debito-cartao.apex`: executa o batch imediatamente via `Database.executeBatch`, sem agendar — útil para rodar sob demanda (`sf apex run --file scripts/apex/run-quitar-debito-cartao.apex --target-org <alias>`).
 
 ## Abas
 
@@ -86,6 +99,12 @@ Cada objeto tem uma list view `Todos` (`filterScope: Everything`, sem filtros �
 - **Carteira__c**: Name, Tipo__c, Instituicao__c, Ativa__c
 - **Recorrencia__c**: Name, Descricao__c, Valor__c, Tipo__c, Empresa__c, Variavel__c, Carteira_Padrao__c, Dia_Vencimento__c, Ativa__c, Tipo_Pagamento__c
 - **Despesa__c**: Name, Descricao__c, Valor__c, Tipo__c, Status__c, Data_Vencimento__c, Data_Pagamento__c, Carteira__c, Tipo_Pagamento__c
+
+`Despesa__c` também tem 3 list views focadas em acompanhamento mensal (filtros combinados com AND):
+
+- **Despesas Abertas do Mês** (`Despesas_Abertas_do_Mes`): `Status__c = 'Pendente'` E `Data_Vencimento__c` no mês corrente (`THIS_MONTH`).
+- **Despesas Pagas do Mês** (`Despesas_Pagas_do_Mes`): `Status__c = 'Pago'` E `Data_Pagamento__c` no mês corrente (`THIS_MONTH`).
+- **Atrasados** (`Atrasados`): `Status__c = 'Pendente'` E `Data_Vencimento__c < TODAY`.
 
 A list view nativa "Recent" (Mais Recentes) **não é gerenciável via Metadata API** (não é retornada por `list metadata`, nem por retrieve explícito, para nenhum objeto padrão ou customizado) — não é possível versioná-la ou definir suas colunas via pacote. Decisão: não mexer nela; `Todos` é a visão principal usada no app.
 
@@ -119,6 +138,8 @@ Criados na org e atribuídos como compact layout padrão (`compactLayoutAssignme
 ## Aplicativo Despesas
 
 Lightning App `Despesas` com apenas os 3 objetos do controle de despesas no menu, nesta ordem: **Despesas**, **Recorrências**, **Carteira**.
+
+`formFactors` inclui `Large` (desktop) e `Small` (app Salesforce mobile), para o app aparecer no launcher do celular. Os `actionOverrides` (Lightning Record Pages) continuam declarados só para `formFactor: Large` — as record pages usam o template `flexipage:recordHomeTemplateDesktop` (Dynamic Forms), não otimizado para telas pequenas; no mobile, o registro cai de volta na página padrão gerada automaticamente pelo Salesforce a partir do Page Layout clássico (mesmo comportamento de qualquer outro objeto sem override mobile).
 
 ### Permission Set `Despesas`
 
@@ -237,11 +258,17 @@ Para atualizar o código depois de um deploy: `npm run build:lambda` de novo, e 
 
 ```bash
 sf project deploy start --target-org <alias>
-sf apex run test --target-org <alias> --class-names CriarDespesasRecorrentesBatchTest --synchronous
+sf apex run test --target-org <alias> --class-names CriarDespesasRecorrentesBatchTest,QuitarDespesasDebitoCartaoBatchTest --synchronous
 ```
 
 ## Histórico de mudanças
 
+- **2026-08-08** — Editados manualmente na org (Setup/Lightning App Builder) e sincronizados com `sf project retrieve start`: nos Page Layouts `Layout de Despesa` e `Layout de Recorrência`, campos reordenados nas colunas da seção "Information". Nas Lightning Record Pages `Despesa_Record_Page` e `Recorrencia_Record_Page`, campo `Observacoes__c` adicionado à área de detalhes (Dynamic Forms) e removida a aba "System Information" (`CreatedById`/`LastModifiedById`).
+- **2026-08-08** — Criado `QuitarDespesasDebitoCartaoBatch` (`Database.Batchable` + `Schedulable`), substituindo por Apex o mecanismo de baixa automática removido junto com o Flow (entrada anterior deste changelog): busca `Despesa__c` pendentes de `Débito Automático`/`Cartão de Crédito` vencendo no dia e marca como `Pago`. Agendado via `scripts/apex/schedule-quitar-debito-cartao.apex` para rodar todo dia às 6h. Testes em `QuitarDespesasDebitoCartaoBatchTest`.
+- **2026-08-08** — Removido o Flow `Quitar_Despesas_Debito_Automatico_Cartao_Credito` (criado e desativado no mesmo dia de trabalho, nunca chegou a ser commitado): desativado na org `financeiro-dev` (job agendado abortado via `System.abortJob`) e removido do pacote local. A baixa automática de `Débito Automático`/`Cartão de Crédito` volta a ser "mecanismo ainda não construído", como descrito na seção do MCP.
+- **2026-08-02** — Adicionado `formFactors: Small` ao aplicativo `Despesas` (mantendo `Large`), para o app ficar disponível no launcher do Salesforce mobile. Os `actionOverrides` das Lightning Record Pages seguem só em `Large`: no celular, os 3 objetos caem para a página padrão do sistema (baseada no Page Layout clássico) em vez das record pages com Dynamic Forms, que usam um template desktop-only. Deploy feito na org `financeiro-dev`.
+- **2026-08-02** — Criadas 3 list views em `Despesa__c` para acompanhamento mensal: `Despesas Abertas do Mês` (`Status__c = 'Pendente'` e vencimento no mês corrente), `Despesas Pagas do Mês` (`Status__c = 'Pago'` e pagamento no mês corrente) e `Atrasados` (`Status__c = 'Pendente'` e vencimento anterior a hoje). Deploy feito na org `financeiro-dev`.
+- **2026-08-02** — Adicionado `scripts/apex/run-batch.apex`, para rodar `CriarDespesasRecorrentesBatch` sob demanda via `Database.executeBatch`, sem passar pelo `System.schedule` (que só é necessário uma vez, via `schedule-batch.apex`).
 - **2026-08-02** — Atualizado o runtime da Lambda `despesas-mcp-server` de `nodejs20.x` para `nodejs22.x`, em resposta ao aviso da AWS de fim de suporte do Node.js 20.x no Lambda (30/abr/2026). Só a configuração do runtime foi trocada (`aws lambda update-function-configuration --runtime nodejs22.x`) — o layer da Lambda Web Adapter não depende da versão do Node, então não precisou de ajuste. Testado ao vivo após a troca: `tools/list` no endpoint `/mcp` respondeu 200 com as 5 ferramentas.
 - **2026-08-02** — Adicionadas as ferramentas `buscar_carteiras` e `criar_despesa` ao `mcp-server`, para registrar despesas avulsas (não vinculadas a nenhuma `Recorrencia__c`) a partir de um comprovante de pagamento já efetuado — foto de nota/recibo ou comprovante de transação por aproximação/NFC no celular. `criar_despesa` cria a `Despesa__c` diretamente com `Status__c = 'Pago'`; a descrição da ferramenta instrui o Claude a chamar `identificar_despesa_por_comprovante` antes, para não duplicar uma despesa pendente já existente, e a nunca adivinhar `carteiraId` — para comprovante de Débito/Pix, pergunta ao usuário qual Conta Corrente cadastrada usar (via `buscar_carteiras` com `tipo = 'Conta Corrente'`); para Cartão de Crédito, pergunta qual cartão cadastrado usar (`tipo = 'Cartão de Crédito'`). Adicionado `createRecord` em `mcp-server/src/salesforce.js` (POST em `/sobjects/{sobject}`, reaproveitando a mesma autenticação client credentials). Redeploy feito na Lambda `despesas-mcp-server`.
 - **2026-08-02** — Removidas as colunas `Empresa__c`, `Variavel__c` e `Recorrencia__c` da list view `Todos` de `Despesa__c`. Deploy feito na org `financeiro-dev`.
