@@ -36,8 +36,8 @@ Modelo de uma despesa que se repete mensalmente (ex: aluguel, assinaturas). O ba
 | Data_Fim__c | Date | Não | Fim da vigência (em branco = sem data de término) |
 | Ativa__c | Checkbox (fórmula) | — | `Data_Inicio__c <= HOJE() && (Data_Fim__c em branco OU Data_Fim__c >= HOJE())` |
 | Carteira_Padrao__c | Lookup(Carteira__c) | Sim | Carteira usada por padrão ao gerar a despesa |
-| Tipo__c | Picklist (Global Value Set `Tipo_Despesa`) | Não | Ações Sociais, Alimentação, Assinaturas, Combustível, Compras, Concessionárias, Educação, Fatura de Cartão, Impostos, Investimentos, Lazer, Moradia, Saúde, Transporte, Outros |
-| Tipo_Pagamento__c | Picklist | Não | Boleto, Débito Automático, Pix, Cartão de Crédito |
+| Tipo__c | Picklist (Global Value Set `Tipo_Despesa`) | Não | Ações Sociais, Alimentação, Assinaturas, Beleza, Combustível, Compras, Concessionárias, Educação, Fatura de Cartão, Hospedagem, Impostos, Investimentos, Lazer, Moradia, Saúde, Transporte, Viagem, Outros |
+| Tipo_Pagamento__c | Picklist | Não | Boleto, Débito Automático, Débito, Pix, Cartão de Crédito |
 | Variavel__c | Checkbox | — | Default `false`. Indica se o valor pode variar de um mês para outro (ex: cartão de crédito, conta de luz) |
 | Empresa__c | Text(120) | Não | Nome da empresa como aparece no recibo/comprovante, para facilitar identificação via MCP |
 | Observacoes__c | LongTextArea(32768) | Não | Observações livres |
@@ -57,7 +57,7 @@ Lançamento mensal de uma despesa, gerado automaticamente a partir de uma recorr
 | Carteira__c | Lookup(Carteira__c) | Sim | Carteira usada no pagamento |
 | Recorrencia__c | Lookup(Recorrencia__c) | Não | Recorrência de origem, quando aplicável |
 | Tipo__c | Picklist (Global Value Set `Tipo_Despesa`) | Não | Mesmos valores de Recorrencia__c.Tipo__c |
-| Tipo_Pagamento__c | Picklist | Não | Boleto, Débito Automático, Pix, Cartão de Crédito |
+| Tipo_Pagamento__c | Picklist | Não | Boleto, Débito Automático, Débito, Pix, Cartão de Crédito |
 | Variavel__c | Checkbox | — | Default `false`. Indica se o valor pode variar de um mês para outro |
 | Empresa__c | Text(120) | Não | Nome da empresa como aparece no recibo/comprovante, para facilitar identificação e quitação via MCP |
 | Observacoes__c | LongTextArea(32768) | Não | Observações livres |
@@ -263,6 +263,8 @@ sf apex run test --target-org <alias> --class-names CriarDespesasRecorrentesBatc
 
 ## Histórico de mudanças
 
+- **2026-08-12** — Adicionado o valor `Débito` ao picklist `Tipo_Pagamento__c` de `Recorrencia__c` e `Despesa__c` (picklist local de cada campo, não é Global Value Set). Distinto de `Débito Automático` (que já existia) — representa débito em conta feito manualmente, não a baixa automática recorrente. Deploy feito na org `financeiro-dev`.
+- **2026-08-11** — Adicionados os valores `Beleza`, `Hospedagem` e `Viagem` ao Global Value Set `Tipo_Despesa`. Deploy feito na org `financeiro-dev`.
 - **2026-08-08** — Editados manualmente na org (Setup/Lightning App Builder) e sincronizados com `sf project retrieve start`: nos Page Layouts `Layout de Despesa` e `Layout de Recorrência`, campos reordenados nas colunas da seção "Information". Nas Lightning Record Pages `Despesa_Record_Page` e `Recorrencia_Record_Page`, campo `Observacoes__c` adicionado à área de detalhes (Dynamic Forms) e removida a aba "System Information" (`CreatedById`/`LastModifiedById`).
 - **2026-08-08** — Criado `QuitarDespesasDebitoCartaoBatch` (`Database.Batchable` + `Schedulable`), substituindo por Apex o mecanismo de baixa automática removido junto com o Flow (entrada anterior deste changelog): busca `Despesa__c` pendentes de `Débito Automático`/`Cartão de Crédito` vencendo no dia e marca como `Pago`. Agendado via `scripts/apex/schedule-quitar-debito-cartao.apex` para rodar todo dia às 6h. Testes em `QuitarDespesasDebitoCartaoBatchTest`.
 - **2026-08-08** — Removido o Flow `Quitar_Despesas_Debito_Automatico_Cartao_Credito` (criado e desativado no mesmo dia de trabalho, nunca chegou a ser commitado): desativado na org `financeiro-dev` (job agendado abortado via `System.abortJob`) e removido do pacote local. A baixa automática de `Débito Automático`/`Cartão de Crédito` volta a ser "mecanismo ainda não construído", como descrito na seção do MCP.

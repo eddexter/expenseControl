@@ -19,6 +19,11 @@
                 <label>Débito Automático</label>
             </value>
             <value>
+                <fullName>Débito</fullName>
+                <default>false</default>
+                <label>Débito</label>
+            </value>
+            <value>
                 <fullName>Pix</fullName>
                 <default>false</default>
                 <label>Pix</label>
