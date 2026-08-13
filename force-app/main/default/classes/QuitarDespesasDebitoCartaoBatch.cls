@@ -1,4 +1,4 @@
-public class QuitarDespesasDebitoCartaoBatch implements Database.Batchable<SObject>, Schedulable {
+public class QuitarDespesasDebitoCartaoBatch implements Database.Batchable<SObject>, Schedulable, Database.AllowsCallouts {
 
     public Database.QueryLocator start(Database.BatchableContext bc) {
         return Database.getQueryLocator([
@@ -19,6 +19,17 @@ public class QuitarDespesasDebitoCartaoBatch implements Database.Batchable<SObje
     }
 
     public void finish(Database.BatchableContext bc) {
+        AsyncApexJob job = [
+            SELECT Status, NumberOfErrors, JobItemsProcessed, TotalJobItems
+            FROM AsyncApexJob
+            WHERE Id = :bc.getJobId()
+        ];
+        String status = (job.NumberOfErrors == 0) ? 'sucesso' : 'falha';
+        LokiLogger.log('QuitarDespesasDebitoCartaoBatch', 'batch_finish', status, bc.getJobId(), new Map<String, Object>{
+            'itensProcessados' => job.JobItemsProcessed,
+            'totalItens' => job.TotalJobItems,
+            'erros' => job.NumberOfErrors
+        });
     }
 
     public void execute(SchedulableContext sc) {

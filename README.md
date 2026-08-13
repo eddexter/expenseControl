@@ -73,6 +73,7 @@ Classe `Database.Batchable` + `Schedulable` que gera as despesas do mês corrent
 - É idempotente: não cria uma nova despesa se já existir uma `Despesa__c` para aquela recorrência no mês corrente.
 - Copia `Descricao__c`, `Valor__c`, `Carteira_Padrao__c`, `Tipo__c`, `Tipo_Pagamento__c`, `Variavel__c` e `Empresa__c` da recorrência para a despesa criada.
 - Testes em `CriarDespesasRecorrentesBatchTest` cobrem: criação para recorrência ativa, não duplicação ao rodar o batch duas vezes no mesmo mês, e não criação para recorrência inativa.
+- `finish()` envia um evento de observabilidade (sucesso/falha) para o Grafana Loki via `LokiLogger` — ver [Observabilidade](#observabilidade).
 - `scripts/apex/schedule-batch.apex`: setup único, agenda o batch via `System.schedule` (dia 1 de cada mês, 01:00).
 - `scripts/apex/run-batch.apex`: executa o batch imediatamente via `Database.executeBatch`, sem agendar — útil para rodar sob demanda (`sf apex run --file scripts/apex/run-batch.apex --target-org <alias>`).
 
@@ -84,8 +85,24 @@ Classe `Database.Batchable` + `Schedulable` que quita automaticamente as despesa
 - Atualiza `Status__c = 'Pago'` e `Data_Pagamento__c = hoje`. Não mexe em despesas já `Pago`/`Cancelado` nem em outros tipos de pagamento.
 - É o mecanismo automático de baixa desses dois tipos de pagamento mencionado no MCP (`quitar_despesa` pede confirmação manual para eles justamente por causa dessa baixa automática).
 - Testes em `QuitarDespesasDebitoCartaoBatchTest` cobrem: quitação de Débito Automático e Cartão de Crédito vencendo hoje, não quitação de outros tipos de pagamento, não quitação de vencimento futuro, e não alteração de despesa já paga.
+- `finish()` envia um evento de observabilidade (sucesso/falha) para o Grafana Loki via `LokiLogger` — ver [Observabilidade](#observabilidade).
 - `scripts/apex/schedule-quitar-debito-cartao.apex`: setup único, agenda o batch via `System.schedule` (todo dia às 6h, horário padrão da org).
 - `scripts/apex/run-quitar-debito-cartao.apex`: executa o batch imediatamente via `Database.executeBatch`, sem agendar — útil para rodar sob demanda (`sf apex run --file scripts/apex/run-quitar-debito-cartao.apex --target-org <alias>`).
+
+## Observabilidade
+
+Stack: **Grafana Cloud (Loki)**, plano gratuito. Escopo: as duas batches acima e as ações de escrita do MCP (`criar_despesa`, `quitar_despesa`). Plano completo de decisão em `claudeplanning/plano-observabilidade.md` (pasta local, gitignorada).
+
+**Princípio central: sem polling.** Nenhuma rotina fica checando periodicamente se algo aconteceu — cada evento é enviado no exato momento em que a ação ocorre, disparado pela própria ação (reduz volume e mantém o consumo dentro do plano gratuito).
+
+- **Ingestão única**: tudo vai como log estruturado em JSON para o Grafana Loki (`/loki/api/v1/push`), tanto das batches quanto do MCP — sem pipeline Prometheus separado. Dashboards de "métricas" (contagem, taxa de sucesso/erro) são construídos em cima desses logs via LogQL.
+- **Evento mínimo**: origem (nome da batch, ou `mcp`), tipo de evento, status (`sucesso`/`falha`/`bloqueado`), timestamp, e um identificador de rastreio (Id da `Despesa__c` ou Id do job).
+- **Lado MCP** (`mcp-server/src/observability.js`): `logEvent()` é chamado a cada tentativa de `criar_despesa`/`quitar_despesa` (sucesso, falha ou bloqueio por validação), via Basic Auth (Instance ID + Access Policy Token). Configurado por `GRAFANA_LOKI_URL`, `GRAFANA_LOKI_USER`, `GRAFANA_LOKI_TOKEN` em `mcp-server/.env` (veja `.env.example`) — se ausentes, o envio é só desabilitado, nunca quebra a ferramenta.
+- **Lado Apex** (`LokiLogger.cls`): callout HTTP feito no `finish()` de cada batch (não em `start()`, por causa das restrições de callout+DML na mesma transação), usando o Named Credential `Grafana_Loki` (`force-app/main/default/namedCredentials/Grafana_Loki.namedCredential-meta.xml`, protocolo Password Authentication → gera o header `Authorization: Basic` automaticamente). Nunca lança exceção — uma falha ao logar não pode derrubar a batch. Status (`sucesso`/`falha`) e contagem de itens/erros vêm de uma consulta a `AsyncApexJob` pelo `bc.getJobId()`.
+- **Testado com mock** (`LokiLoggerMock.cls`, `@isTest`): `LokiLoggerTest` cobre resposta de sucesso, resposta de erro HTTP e callout sem mock — em todos os casos `LokiLogger.log()` não propaga exceção. Os testes das duas batches (`QuitarDespesasDebitoCartaoBatchTest`, `CriarDespesasRecorrentesBatchTest`) usam o mesmo mock.
+- **No ar**: credenciais reais da stack Grafana Cloud (`robustcape2800`) preenchidas no Named Credential `Grafana_Loki` (Setup) e em `mcp-server/.env` — validado com eventos de teste reais recebendo `204` do Loki, tanto do lado MCP quanto do lado Apex (callout direto via Named Credential). O deploy inicial usou endpoint/usuário/senha placeholder (`SUBSTITUIR...`) só porque a Metadata API exige algum valor não vazio para o protocolo Password — nunca foi um segredo de verdade. Se as credenciais reais forem removidas/expirarem, os callouts das batches voltam a falhar silenciosamente (comportamento esperado — não afeta a baixa/criação de despesas) e o envio do MCP fica desabilitado até `GRAFANA_LOKI_*` serem preenchidos de novo.
+- ⚠️ A stack do Grafana foi criada em modo **trial** — checar em `View Plans` no Grafana se ela cai automaticamente pro tier gratuito ao acabar o trial.
+- **Fora do escopo da primeira fase**: duração/performance das batches, alertas de divergência de valor, e o dashboard em si (ainda não montado).
 
 ## Abas
 
@@ -213,7 +230,10 @@ cd mcp-server
 
 # 1. Empacotar: instala deps de produção numa pasta limpa e gera dist/function.zip
 #    (run.sh vai com permissão 0755 dentro do zip via `archiver`, já que o
-#    Compress-Archive do Windows não preserva permissões Unix)
+#    Compress-Archive do Windows não preserva permissões Unix; o build também
+#    normaliza o run.sh pra LF, senão CRLF no checkout — comum em Windows com
+#    core.autocrlf=true — quebra o shebang e a Lambda nem sobe: "cannot execute:
+#    required file not found". Ver .gitattributes.)
 npm run build:lambda
 
 # 2. Gerar o token de autenticação (é a senha de login E a chave de assinatura OAuth)
@@ -263,6 +283,9 @@ sf apex run test --target-org <alias> --class-names CriarDespesasRecorrentesBatc
 
 ## Histórico de mudanças
 
+- **2026-08-13** — Redeploy da Lambda `despesas-mcp-server` com o código de observabilidade (estava rodando código de antes de o `LokiLogger`/`observability.js` existirem — as env vars `GRAFANA_LOKI_*` sozinhas não bastavam). No processo, achado e corrigido um bug de build: `mcp-server/scripts/build-lambda-zip.mjs` copiava `run.sh` sem normalizar quebra de linha — num checkout Windows com `core.autocrlf=true`, o shebang virava `#!/bin/bash\r` e a Lambda falhava ao subir (`cannot execute: required file not found`, `Runtime.ExitError` em todo invocation). Corrigido normalizando para LF no build (independente da config local de quem builda) e adicionado `.gitattributes` (`mcp-server/run.sh text eol=lf`) como reforço. Validado ponta a ponta: despesa criada via conector remoto do Claude.ai e evento correspondente aparecendo no Grafana.
+- **2026-08-13** — Observabilidade (Grafana Cloud/Loki) colocada no ar: stack `robustcape2800`, Access Policy `expensecontrol-write` (`logs:write`, `metrics:write`) e token gerados; credenciais preenchidas em `mcp-server/.env` e no Named Credential `Grafana_Loki` (org `financeiro-dev`), sem o token passar pelo chat. Validado com eventos de teste reais recebendo `204` do Loki nos dois lados (MCP e Apex).
+- **2026-08-12** — Implementada a primeira fase de observabilidade (Grafana Cloud/Loki, ver seção [Observabilidade](#observabilidade)): criadas as classes Apex `LokiLogger` (+ `LokiLoggerMock`/`LokiLoggerTest`) e o Named Credential `Grafana_Loki`; `CriarDespesasRecorrentesBatch` e `QuitarDespesasDebitoCartaoBatch` passaram a implementar `Database.AllowsCallouts` e a logar sucesso/falha no `finish()`. Criado `mcp-server/src/observability.js` e integrado às ferramentas `criar_despesa`/`quitar_despesa`. Deploy feito na org `financeiro-dev` (10/10 testes passando); Named Credential deployado com endpoint/usuário/senha placeholder — ainda pendente um admin preencher com os dados reais da stack Grafana.
 - **2026-08-12** — Adicionado o valor `Débito` ao picklist `Tipo_Pagamento__c` de `Recorrencia__c` e `Despesa__c` (picklist local de cada campo, não é Global Value Set). Distinto de `Débito Automático` (que já existia) — representa débito em conta feito manualmente, não a baixa automática recorrente. Deploy feito na org `financeiro-dev`.
 - **2026-08-11** — Adicionados os valores `Beleza`, `Hospedagem` e `Viagem` ao Global Value Set `Tipo_Despesa`. Deploy feito na org `financeiro-dev`.
 - **2026-08-08** — Editados manualmente na org (Setup/Lightning App Builder) e sincronizados com `sf project retrieve start`: nos Page Layouts `Layout de Despesa` e `Layout de Recorrência`, campos reordenados nas colunas da seção "Information". Nas Lightning Record Pages `Despesa_Record_Page` e `Recorrencia_Record_Page`, campo `Observacoes__c` adicionado à área de detalhes (Dynamic Forms) e removida a aba "System Information" (`CreatedById`/`LastModifiedById`).

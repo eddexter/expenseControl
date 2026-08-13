@@ -20,9 +20,15 @@ fs.rmSync(distDir, { recursive: true, force: true });
 fs.mkdirSync(buildDir, { recursive: true });
 fs.mkdirSync(distDir, { recursive: true });
 
-for (const file of ['package.json', 'package-lock.json', 'run.sh']) {
+for (const file of ['package.json', 'package-lock.json']) {
   fs.copyFileSync(path.join(root, file), path.join(buildDir, file));
 }
+// run.sh é o entrypoint (shebang) executado pela Lambda Web Adapter no Linux — se o
+// checkout local tiver CRLF (comum em Windows com core.autocrlf=true), o shebang vira
+// "#!/bin/bash\r" e a Lambda falha com "cannot execute: required file not found".
+// Normaliza pra LF aqui, independente do .gitattributes/config local de quem builda.
+const runShContent = fs.readFileSync(path.join(root, 'run.sh'), 'utf8').replace(/\r\n/g, '\n');
+fs.writeFileSync(path.join(buildDir, 'run.sh'), runShContent);
 fs.cpSync(path.join(root, 'src'), path.join(buildDir, 'src'), { recursive: true });
 
 console.log('Instalando dependências de produção em .build/...');

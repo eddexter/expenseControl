@@ -54,6 +54,7 @@ private class QuitarDespesasDebitoCartaoBatchTest {
 
     @isTest
     static void testQuitaDebitoAutomaticoECartaoVencendoHoje() {
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock());
         Test.startTest();
         Database.executeBatch(new QuitarDespesasDebitoCartaoBatch());
         Test.stopTest();
@@ -74,6 +75,7 @@ private class QuitarDespesasDebitoCartaoBatchTest {
 
     @isTest
     static void testNaoQuitaOutroTipoDePagamento() {
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock());
         Test.startTest();
         Database.executeBatch(new QuitarDespesasDebitoCartaoBatch());
         Test.stopTest();
@@ -84,6 +86,7 @@ private class QuitarDespesasDebitoCartaoBatchTest {
 
     @isTest
     static void testNaoQuitaVencimentoFuturo() {
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock());
         Test.startTest();
         Database.executeBatch(new QuitarDespesasDebitoCartaoBatch());
         Test.stopTest();
@@ -94,6 +97,7 @@ private class QuitarDespesasDebitoCartaoBatchTest {
 
     @isTest
     static void testNaoAlteraDespesaJaPaga() {
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock());
         Test.startTest();
         Database.executeBatch(new QuitarDespesasDebitoCartaoBatch());
         Test.stopTest();
