@@ -50,3 +50,6 @@ mcp-server/dist/
 **/__pycache__/
 **/.venv/
 **/venv/
+
+# Claude planning scratch files
+claudeplanning/

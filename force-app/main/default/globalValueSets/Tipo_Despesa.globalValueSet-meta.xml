@@ -16,6 +16,11 @@
         <label>Assinaturas</label>
     </customValue>
     <customValue>
+        <fullName>Beleza</fullName>
+        <default>false</default>
+        <label>Beleza</label>
+    </customValue>
+    <customValue>
         <fullName>Combustível</fullName>
         <default>false</default>
         <label>Combustível</label>
@@ -39,6 +44,11 @@
         <fullName>Fatura de Cartão</fullName>
         <default>false</default>
         <label>Fatura de Cartão</label>
+    </customValue>
+    <customValue>
+        <fullName>Hospedagem</fullName>
+        <default>false</default>
+        <label>Hospedagem</label>
     </customValue>
     <customValue>
         <fullName>Impostos</fullName>
@@ -69,6 +79,11 @@
         <fullName>Transporte</fullName>
         <default>false</default>
         <label>Transporte</label>
+    </customValue>
+    <customValue>
+        <fullName>Viagem</fullName>
+        <default>false</default>
+        <label>Viagem</label>
     </customValue>
     <customValue>
         <fullName>Outros</fullName>
