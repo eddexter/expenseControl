@@ -1,0 +1,4 @@
+# mcp-server/run.sh precisa de LF (é o CMD/entrypoint da Lambda no Linux — um shebang
+# com CRLF quebra a execução: "cannot execute: required file not found"). Força LF
+# no checkout independente do core.autocrlf de cada dev (ver mcp-server/scripts/build-lambda-zip.mjs).
+mcp-server/run.sh text eol=lf

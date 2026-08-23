@@ -81,6 +81,11 @@
         <label>Transporte</label>
     </customValue>
     <customValue>
+        <fullName>Vestuário</fullName>
+        <default>false</default>
+        <label>Vestuário</label>
+    </customValue>
+    <customValue>
         <fullName>Viagem</fullName>
         <default>false</default>
         <label>Viagem</label>

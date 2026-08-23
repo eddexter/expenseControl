@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { querySOQL, updateRecord, createRecord } from './salesforce.js';
 import { scoreCandidate } from './matching.js';
+import { logEvent } from './observability.js';
 
 const DESPESA_FIELDS = [
   'Id',
@@ -151,12 +152,14 @@ export function createServer() {
         }
 
         if (despesa.Status__c !== 'Pendente' && !forcar) {
+          await logEvent({ tipoEvento: 'quitar_despesa', status: 'bloqueado', idRastreio: despesa.Id, detalhes: { motivo: 'status_nao_pendente', statusAtual: despesa.Status__c } });
           return errorResult(
             `Despesa ${despesa.Id} (${despesa.Descricao__c}) está com Status__c = '${despesa.Status__c}', não 'Pendente'. Passe forcar = true para quitar mesmo assim.`
           );
         }
 
         if (TIPOS_PAGAMENTO_QUITACAO_CONFIRMACAO.includes(despesa.Tipo_Pagamento__c) && !forcar) {
+          await logEvent({ tipoEvento: 'quitar_despesa', status: 'bloqueado', idRastreio: despesa.Id, detalhes: { motivo: 'confirmacao_tipo_pagamento', tipoPagamento: despesa.Tipo_Pagamento__c } });
           return errorResult(
             `Despesa ${despesa.Id} (${despesa.Descricao__c}) tem Tipo_Pagamento__c = '${despesa.Tipo_Pagamento__c}'. Confirme com o usuário se essa despesa deve mesmo ser quitada manualmente antes de prosseguir, e passe forcar = true para efetivar.`
           );
@@ -167,6 +170,7 @@ export function createServer() {
         if (valorPago != null) {
           const diff = Math.abs(valorPago - despesa.Valor__c);
           if (!despesa.Variavel__c && diff > 0.02 && !forcar) {
+            await logEvent({ tipoEvento: 'quitar_despesa', status: 'bloqueado', idRastreio: despesa.Id, detalhes: { motivo: 'divergencia_valor', valorPago, valorCadastrado: despesa.Valor__c } });
             return errorResult(
               `Valor pago (${valorPago}) diverge do valor cadastrado (${despesa.Valor__c}) e a despesa NÃO é variável. Passe forcar = true se o valor pago estiver correto mesmo assim.`
             );
@@ -178,6 +182,8 @@ export function createServer() {
 
         await updateRecord('Despesa__c', despesa.Id, fields);
 
+        await logEvent({ tipoEvento: 'quitar_despesa', status: 'sucesso', idRastreio: despesa.Id, detalhes: { empresa: despesa.Empresa__c, descricao: despesa.Descricao__c, ...fields } });
+
         return textResult({
           sucesso: true,
           despesaId: despesa.Id,
@@ -186,6 +192,7 @@ export function createServer() {
           camposAtualizados: fields
         });
       } catch (err) {
+        await logEvent({ tipoEvento: 'quitar_despesa', status: 'falha', idRastreio: despesaId, detalhes: { erro: err.message } });
         return errorResult(err.message);
       }
     }
@@ -274,12 +281,15 @@ export function createServer() {
 
         const despesaId = await createRecord('Despesa__c', fields);
 
+        await logEvent({ tipoEvento: 'criar_despesa', status: 'sucesso', idRastreio: despesaId, detalhes: { ...fields } });
+
         return textResult({
           sucesso: true,
           despesaId,
           camposCriados: fields
         });
       } catch (err) {
+        await logEvent({ tipoEvento: 'criar_despesa', status: 'falha', detalhes: { erro: err.message } });
         return errorResult(err.message);
       }
     }

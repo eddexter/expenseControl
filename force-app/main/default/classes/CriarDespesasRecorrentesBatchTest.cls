@@ -31,6 +31,7 @@ private class CriarDespesasRecorrentesBatchTest {
     static void testCriaDespesaParaRecorrenciaAtiva() {
         Recorrencia__c rec = [SELECT Id FROM Recorrencia__c WHERE Descricao__c = 'Aluguel' LIMIT 1];
 
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock());
         Test.startTest();
         Database.executeBatch(new CriarDespesasRecorrentesBatch());
         Test.stopTest();
@@ -58,6 +59,7 @@ private class CriarDespesasRecorrentesBatchTest {
     static void testNaoDuplicaAoRodarBatchDuasVezes() {
         Recorrencia__c rec = [SELECT Id FROM Recorrencia__c WHERE Descricao__c = 'Aluguel' LIMIT 1];
 
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock());
         Test.startTest();
         Database.executeBatch(new CriarDespesasRecorrentesBatch());
         Database.executeBatch(new CriarDespesasRecorrentesBatch());
@@ -71,6 +73,7 @@ private class CriarDespesasRecorrentesBatchTest {
     static void testNaoCriaDespesaParaRecorrenciaInativa() {
         Recorrencia__c rec = [SELECT Id FROM Recorrencia__c WHERE Descricao__c = 'Antiga Assinatura' LIMIT 1];
 
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock());
         Test.startTest();
         Database.executeBatch(new CriarDespesasRecorrentesBatch());
         Test.stopTest();
