@@ -125,6 +125,10 @@ Cada objeto tem uma list view `Todos` (`filterScope: Everything`, sem filtros �
 
 A list view nativa "Recent" (Mais Recentes) **não é gerenciável via Metadata API** (não é retornada por `list metadata`, nem por retrieve explícito, para nenhum objeto padrão ou customizado) — não é possível versioná-la ou definir suas colunas via pacote. Decisão: não mexer nela; `Todos` é a visão principal usada no app.
 
+## Report Types
+
+- **Despesas com Carteiras** (`Despesas_com_carteiras`): report type customizado, `baseObject` = `Carteira__c`, com join (`outerJoin`) na relação `Despesas__r` — permite relatórios de carteiras incluindo (ou não) suas despesas, inclusive carteiras sem nenhuma despesa. Seção `Carteiras` traz os campos padrão mais `Ativa__c`, `Instituicao__c`, `Observacoes__c`, `Tipo__c`; seção `Despesas` traz `Data_Pagamento__c`, `Data_Vencimento__c`, `Descricao__c`, `Observacoes__c`, `Recorrencia__c`, `Status__c`, `Valor__c`, `Empresa__c`, `Tipo_Pagamento__c`, `Variavel__c`, `Tipo__c`.
+
 ## Page Layouts
 
 Cada objeto customizado já vem com um layout padrão gerado automaticamente pelo Salesforce na criação do objeto (existe mesmo sem nunca termos feito deploy de nenhum `Layout` — não aparece no retrieve até você mexer nele ou explicitamente pedir). Esse layout do sistema é o que os perfis realmente usam por padrão; um `Layout` novo que a gente cria via metadata **não vira automaticamente o default** — fica como um layout adicional, não atribuído, a menos que seja explicitamente atribuído por perfil.
@@ -283,6 +287,7 @@ sf apex run test --target-org <alias> --class-names CriarDespesasRecorrentesBatc
 
 ## Histórico de mudanças
 
+- **2026-08-23** — Adicionado o Report Type customizado `Despesas com Carteiras` (`baseObject` = `Carteira__c`, join com `Despesas__r`). Ver seção [Report Types](#report-types).
 - **2026-08-23** — Ajustado o log de observabilidade do MCP (`mcp-server/src/server.js`): o evento de `sucesso` de `criar_despesa`/`quitar_despesa` agora carrega no `detalhes` todos os campos efetivamente persistidos na `Despesa__c` naquela chamada, em vez de um resumo (`empresa`/`valor`). Ver seção [Observabilidade](#observabilidade).
 - **2026-08-14** — Adicionado o valor `Vestuário` ao Global Value Set `Tipo_Despesa`. Deploy feito na org `financeiro-dev`.
 - **2026-08-13** — Redeploy da Lambda `despesas-mcp-server` com o código de observabilidade (estava rodando código de antes de o `LokiLogger`/`observability.js` existirem — as env vars `GRAFANA_LOKI_*` sozinhas não bastavam). No processo, achado e corrigido um bug de build: `mcp-server/scripts/build-lambda-zip.mjs` copiava `run.sh` sem normalizar quebra de linha — num checkout Windows com `core.autocrlf=true`, o shebang virava `#!/bin/bash\r` e a Lambda falhava ao subir (`cannot execute: required file not found`, `Runtime.ExitError` em todo invocation). Corrigido normalizando para LF no build (independente da config local de quem builda) e adicionado `.gitattributes` (`mcp-server/run.sh text eol=lf`) como reforço. Validado ponta a ponta: despesa criada via conector remoto do Claude.ai e evento correspondente aparecendo no Grafana.
