@@ -182,7 +182,7 @@ export function createServer() {
 
         await updateRecord('Despesa__c', despesa.Id, fields);
 
-        await logEvent({ tipoEvento: 'quitar_despesa', status: 'sucesso', idRastreio: despesa.Id, detalhes: { empresa: despesa.Empresa__c } });
+        await logEvent({ tipoEvento: 'quitar_despesa', status: 'sucesso', idRastreio: despesa.Id, detalhes: { empresa: despesa.Empresa__c, descricao: despesa.Descricao__c, ...fields } });
 
         return textResult({
           sucesso: true,
@@ -281,7 +281,7 @@ export function createServer() {
 
         const despesaId = await createRecord('Despesa__c', fields);
 
-        await logEvent({ tipoEvento: 'criar_despesa', status: 'sucesso', idRastreio: despesaId, detalhes: { empresa: fields.Empresa__c, valor: fields.Valor__c } });
+        await logEvent({ tipoEvento: 'criar_despesa', status: 'sucesso', idRastreio: despesaId, detalhes: { ...fields } });
 
         return textResult({
           sucesso: true,
