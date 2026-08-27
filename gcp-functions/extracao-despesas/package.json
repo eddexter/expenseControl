@@ -1,0 +1,17 @@
+{
+  "name": "extracao-despesas-fn",
+  "version": "1.0.0",
+  "description": "Cloud Function (HTTP) que recebe o payload de Despesa__c do Salesforce (MVP4) e grava no BigQuery via load job.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "functions-framework --target=extrairDespesas --source=. --port=8080"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@google-cloud/bigquery": "^7.9.1",
+    "@google-cloud/functions-framework": "^3.4.2"
+  }
+}

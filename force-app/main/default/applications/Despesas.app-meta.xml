@@ -4,32 +4,38 @@
         <actionName>View</actionName>
         <content>Carteira_Record_Page</content>
         <formFactor>Large</formFactor>
-        <pageOrSobjectType>Carteira__c</pageOrSobjectType>
+        <skipRecordTypeSelect>false</skipRecordTypeSelect>
         <type>Flexipage</type>
+        <pageOrSobjectType>Carteira__c</pageOrSobjectType>
     </actionOverrides>
     <actionOverrides>
         <actionName>View</actionName>
         <content>Despesa_Record_Page</content>
         <formFactor>Large</formFactor>
-        <pageOrSobjectType>Despesa__c</pageOrSobjectType>
+        <skipRecordTypeSelect>false</skipRecordTypeSelect>
         <type>Flexipage</type>
+        <pageOrSobjectType>Despesa__c</pageOrSobjectType>
     </actionOverrides>
     <actionOverrides>
         <actionName>View</actionName>
         <content>Recorrencia_Record_Page</content>
         <formFactor>Large</formFactor>
-        <pageOrSobjectType>Recorrencia__c</pageOrSobjectType>
+        <skipRecordTypeSelect>false</skipRecordTypeSelect>
         <type>Flexipage</type>
+        <pageOrSobjectType>Recorrencia__c</pageOrSobjectType>
     </actionOverrides>
-    <label>Despesas</label>
     <description>Aplicativo de controle de despesas mensais, recorrências e carteiras.</description>
-    <formFactors>Large</formFactors>
     <formFactors>Small</formFactors>
+    <formFactors>Large</formFactors>
     <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
     <isNavPersonalizationDisabled>false</isNavPersonalizationDisabled>
+    <isNavTabPersistenceDisabled>false</isNavTabPersistenceDisabled>
+    <isOmniPinnedViewEnabled>false</isOmniPinnedViewEnabled>
+    <label>Despesas</label>
     <navType>Standard</navType>
     <tabs>Despesa__c</tabs>
     <tabs>Recorrencia__c</tabs>
     <tabs>Carteira__c</tabs>
+    <tabs>Admin_Page</tabs>
     <uiType>Lightning</uiType>
 </CustomApplication>
