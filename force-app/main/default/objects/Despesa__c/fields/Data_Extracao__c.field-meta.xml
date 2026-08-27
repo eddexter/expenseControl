@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Data_Extracao__c</fullName>
+    <description>Preenchido com a data em que a despesa foi extraída com sucesso para o BigQuery (MVP4). Em branco = ainda não extraída. Garante idempotência: a extração só processa registros com este campo vazio.</description>
+    <label>Data de Extração</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Date</type>
+</CustomField>

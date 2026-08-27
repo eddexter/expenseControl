@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>66.0</apiVersion>
+    <interviewLabel>Extração de Despesas para BigQuery {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Extração de Despesas para BigQuery</label>
+    <processType>Flow</processType>
+    <status>Active</status>
+
+    <description>Tela de Admin (MVP4): o admin escolhe o mês de vencimento e dispara a extração sob demanda de Despesa__c para o BigQuery. Ver claudeplanning/plano-extracao-mvp4.md.</description>
+
+    <actionCalls>
+        <name>Extrair_Despesas</name>
+        <label>Extrair Despesas</label>
+        <locationX>176</locationX>
+        <locationY>242</locationY>
+        <actionName>ExtracaoDespesasBigQuery</actionName>
+        <actionType>apex</actionType>
+        <connector>
+            <targetReference>Resultado</targetReference>
+        </connector>
+        <inputParameters>
+            <name>mesVencimento</name>
+            <value>
+                <elementReference>mesVencimentoInput</elementReference>
+            </value>
+        </inputParameters>
+        <outputParameters>
+            <assignToReference>mensagemResultado</assignToReference>
+            <name>mensagem</name>
+        </outputParameters>
+    </actionCalls>
+
+    <screens>
+        <name>Selecionar_Mes</name>
+        <label>Selecionar Mês</label>
+        <locationX>176</locationX>
+        <locationY>134</locationY>
+        <allowBack>true</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>true</allowPause>
+        <connector>
+            <targetReference>Extrair_Despesas</targetReference>
+        </connector>
+        <fields>
+            <name>mesVencimentoInput</name>
+            <dataType>Date</dataType>
+            <fieldText>Mês de vencimento a extrair (qualquer dia dentro do mês desejado)</fieldText>
+            <fieldType>InputField</fieldType>
+            <isRequired>true</isRequired>
+        </fields>
+    </screens>
+
+    <screens>
+        <name>Resultado</name>
+        <label>Resultado</label>
+        <locationX>176</locationX>
+        <locationY>350</locationY>
+        <allowBack>false</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <fields>
+            <name>resultadoTexto</name>
+            <fieldText>&lt;p&gt;{!mensagemResultado}&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+    </screens>
+
+    <variables>
+        <name>mensagemResultado</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Selecionar_Mes</targetReference>
+        </connector>
+    </start>
+</Flow>

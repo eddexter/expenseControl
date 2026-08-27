@@ -61,6 +61,7 @@ Lançamento mensal de uma despesa, gerado automaticamente a partir de uma recorr
 | Variavel__c | Checkbox | — | Default `false`. Indica se o valor pode variar de um mês para outro |
 | Empresa__c | Text(120) | Não | Nome da empresa como aparece no recibo/comprovante, para facilitar identificação e quitação via MCP |
 | Observacoes__c | LongTextArea(32768) | Não | Observações livres |
+| Data_Extracao__c | Date | Não | Preenchido com a data em que a despesa foi extraída com sucesso para o BigQuery (MVP4). Em branco = ainda não extraída; garante idempotência da extração. Ver [Extração para BigQuery (MVP4)](#extração-para-bigquery-mvp4) |
 
 ## Automação
 
@@ -103,6 +104,35 @@ Stack: **Grafana Cloud (Loki)**, plano gratuito. Escopo: as duas batches acima e
 - **No ar**: credenciais reais da stack Grafana Cloud (`robustcape2800`) preenchidas no Named Credential `Grafana_Loki` (Setup) e em `mcp-server/.env` — validado com eventos de teste reais recebendo `204` do Loki, tanto do lado MCP quanto do lado Apex (callout direto via Named Credential). O deploy inicial usou endpoint/usuário/senha placeholder (`SUBSTITUIR...`) só porque a Metadata API exige algum valor não vazio para o protocolo Password — nunca foi um segredo de verdade. Se as credenciais reais forem removidas/expirarem, os callouts das batches voltam a falhar silenciosamente (comportamento esperado — não afeta a baixa/criação de despesas) e o envio do MCP fica desabilitado até `GRAFANA_LOKI_*` serem preenchidos de novo.
 - ⚠️ A stack do Grafana foi criada em modo **trial** — checar em `View Plans` no Grafana se ela cai automaticamente pro tier gratuito ao acabar o trial.
 - **Fora do escopo da primeira fase**: duração/performance das batches, alertas de divergência de valor, e o dashboard em si (ainda não montado).
+
+## Extração para BigQuery (MVP4)
+
+Extração **sob demanda** de `Despesa__c` para o Google Cloud (BigQuery), disparada manualmente pelo admin depois de revisar/conferir os dados do mês — sem agendamento automático, sem polling. Plano completo de decisão em `claudeplanning/plano-extracao-mvp4.md` (pasta local, gitignorada).
+
+**Arquitetura**: Salesforce continua **push** — o Apex monta o payload achatado (com os campos de `Carteira__c` via relacionamento) e envia pronto pra uma Cloud Function no GCP, que grava direto no BigQuery via **load job** (não streaming insert — sem custo). Sem Cloud Storage, sem catálogo separado: o BigQuery é ao mesmo tempo onde o dado mora, o schema é definido, e o motor que roda o SQL.
+
+- **Idempotência**: campo `Despesa__c.Data_Extracao__c` (Date), em branco por padrão. A extração busca `Data_Extracao__c = null` combinado com o mês de vencimento escolhido pelo admin. O campo só é preenchido **depois** da confirmação de sucesso do callout — se falhar, a próxima tentativa (mesmo mês) pega os mesmos registros de novo, sem duplicar e sem perder.
+- **Modelo de dados no BigQuery: append-only**. Cada rodada de extração adiciona linhas na tabela raw `despesas_raw` (nunca sobrescreve), carregando `extraction_timestamp` e `despesa_id` além dos campos de negócio. O "estado atual" é resolvido por uma view deduplicada `despesas_atual` (`ROW_NUMBER() OVER (PARTITION BY despesa_id ORDER BY extraction_timestamp DESC)`), que é o que o Looker Studio (MVP5) deve consultar.
+
+### Lado Salesforce
+
+- **`ExtracaoDespesasBigQuery.cls`**: SOQL (`Data_Extracao__c = null` + `Data_Vencimento__c` no intervalo do mês escolhido, com `Carteira__r.Name`/`Tipo__c`/`Instituicao__c`), callout via Named Credential, e só em caso de sucesso faz `UPDATE Data_Extracao__c = Date.today()` nos registros processados. Exposto como `@InvocableMethod` (wrapper `ExtracaoInput`/`ExtracaoResultado`) para o Flow chamar. Testado em `ExtracaoDespesasBigQueryTest.cls` com `HttpCalloutMock` (reaproveita `LokiLoggerMock`), cobrindo mês certo/errado, idempotência e falha de callout.
+  - **Gotcha real encontrado num teste ponta a ponta**: `Date.format()` no Apex é sensível ao locale da org (produzia `02/08/2026` nesta org pt-BR) — o BigQuery exige `DATE` em ISO 8601 (`yyyy-MM-dd`) e rejeitava a carga inteira (`Invalid date`). Corrigido usando `String.valueOf(Date)` (sempre ISO, independente do locale) num helper `toIsoDate()`. Teste de regressão: `testPayloadEnviaDataEmFormatoIso` captura o corpo da requisição e garante que não há `/` no payload.
+- **Named Credential `GCP_Extracao_Despesas`** (`force-app/main/default/namedCredentials/GCP_Extracao_Despesas.namedCredential-meta.xml`): mesmo padrão do `Grafana_Loki` — protocolo Password Authentication, gera o header `Authorization: Basic` automaticamente a partir de um segredo compartilhado. O username não é validado do lado da Cloud Function, só a senha (o segredo) importa. Deployado com endpoint/senha placeholder (`SUBSTITUIR...`); credenciais reais preenchidas manualmente em Setup (mesmo aviso de cautela do `Grafana_Loki`: um redeploy deste arquivo sobrescreve as credenciais reais na org de volta pros placeholders).
+- **Flow `Extracao_Despesas_Mensal`** (`force-app/main/default/flows/`, o primeiro Flow do projeto): tela de seleção do mês de vencimento (screen flow) que chama o Apex invocável e mostra o resultado.
+- **FlexiPage `Admin_Page`** (`force-app/main/default/flexipages/Admin_Page.flexipage-meta.xml`, App Page, template `flexipage:appHomeTemplateTwoColumns`): embute o Flow via o componente padrão `flowruntime:interview` (propriedades `flowName` + `flowLayout: oneColumn`) — **não** `flexipage:flow`/`flowApiName`, que é o nome intuitivo mas incorreto (não existe como componente deployável via Metadata API; descoberto por tentativa/erro, ver histórico). Por isso esta FlexiPage foi montada uma vez no Lightning App Builder (não escrita à mão) e trazida pro repo via `sf project retrieve start -m "CustomTab:Admin_Page"` + retrieve da própria FlexiPage — mesmo padrão já usado nas Lightning Record Pages para Dynamic Forms. Exposta como tab `Admin_Page` (`force-app/main/default/tabs/Admin_Page.tab-meta.xml`) no aplicativo `Despesas`.
+
+### Lado GCP
+
+- **Projeto**: `project-fb964f4a-f81d-43d5-bb2` ("Minha despesas - Analitcs"), região `southamerica-east1`, faturamento vinculado à conta `Minha conta de faturamento` (alerta de orçamento mensal já configurado pelo usuário — R$ 50, thresholds 50/90/100/150%).
+- **BigQuery**: dataset `expense_control`, tabela raw `despesas_raw` (schema: `despesa_id`, `descricao`, `valor`, `status`, `data_vencimento`, `data_pagamento`, `tipo`, `tipo_pagamento`, `variavel`, `empresa`, `carteira_nome`, `carteira_tipo`, `carteira_instituicao`, `extraction_timestamp`), view deduplicada `despesas_atual`.
+- **Cloud Function `extrairDespesas`** (2ª geração, Node.js 22, `gcp-functions/extracao-despesas/`, HTTP trigger, região `southamerica-east1`): pública (`--allow-unauthenticated`, mesmo modelo da Function URL da Lambda do MCP), protegida por um segredo compartilhado (`INGEST_SHARED_SECRET`) validado contra a senha do Basic Auth gerado pelo Named Credential. Grava no BigQuery via `table.createWriteStream` (load job, não streaming insert). Service Account dedicada `extracao-despesas-fn@project-fb964f4a-f81d-43d5-bb2.iam.gserviceaccount.com` com `roles/bigquery.dataEditor` + `roles/bigquery.jobUser`.
+- **Deploy**: `gcloud functions deploy extrairDespesas --gen2 --region=southamerica-east1 --runtime=nodejs22 --source=gcp-functions/extracao-despesas --entry-point=extrairDespesas --trigger-http --allow-unauthenticated --service-account=... --set-env-vars=...`. Validado ponta a ponta via `curl` (401 sem auth, 200 com auth gravando no BigQuery) e via Apex real na org (`ExtracaoDespesasBigQuery.extrairMes`).
+- **Descoberto no processo**: um projeto GCP novo (mesmo com faturamento ativo) não recebe mais o papel Editor automático nas service accounts padrão (`compute@developer` e `@cloudbuild`) por causa da política de organização que desabilita concessões automáticas de IAM — foi preciso conceder manualmente `roles/cloudbuild.builds.builder`, `roles/artifactregistry.writer`, `roles/logging.logWriter` e `roles/storage.objectViewer` à **service account padrão do Compute Engine** (não só à do Cloud Build) para o build da function (2ª geração) funcionar.
+
+### Status
+
+**No ar e validado ponta a ponta com dado real**: campo `Data_Extracao__c`, Named Credential, `ExtracaoDespesasBigQuery` (+Test), Flow, FlexiPage/tab `Admin_Page`, Cloud Function, dataset/tabela/view no BigQuery. A primeira extração real (agosto/2026) processou 124 despesas com sucesso, confirmadas no BigQuery com datas em ISO corretas; uma segunda chamada no mesmo mês extraiu 0 (idempotência confirmada). MVP5 (dashboards Looker Studio) ainda não iniciado — só a view `despesas_atual` está pronta para conectar.
 
 ## Abas
 
@@ -158,7 +188,7 @@ Criados na org e atribuídos como compact layout padrão (`compactLayoutAssignme
 
 ## Aplicativo Despesas
 
-Lightning App `Despesas` com apenas os 3 objetos do controle de despesas no menu, nesta ordem: **Despesas**, **Recorrências**, **Carteira**.
+Lightning App `Despesas` com os 3 objetos do controle de despesas no menu, nesta ordem: **Despesas**, **Recorrências**, **Carteira** — mais a tab **Admin Page** (`Admin_Page`), que embute o Flow de extração para o BigQuery (MVP4, ver seção [Extração para BigQuery (MVP4)](#extração-para-bigquery-mvp4)).
 
 `formFactors` inclui `Large` (desktop) e `Small` (app Salesforce mobile), para o app aparecer no launcher do celular. Os `actionOverrides` (Lightning Record Pages) continuam declarados só para `formFactor: Large` — as record pages usam o template `flexipage:recordHomeTemplateDesktop` (Dynamic Forms), não otimizado para telas pequenas; no mobile, o registro cai de volta na página padrão gerada automaticamente pelo Salesforce a partir do Page Layout clássico (mesmo comportamento de qualquer outro objeto sem override mobile).
 
@@ -287,6 +317,7 @@ sf apex run test --target-org <alias> --class-names CriarDespesasRecorrentesBatc
 
 ## Histórico de mudanças
 
+- **2026-08-24** — Implementado o MVP4 (extração sob demanda Salesforce → GCP/BigQuery, ver seção [Extração para BigQuery (MVP4)](#extração-para-bigquery-mvp4)): campo `Despesa__c.Data_Extracao__c`, Named Credential `GCP_Extracao_Despesas`, classes `ExtracaoDespesasBigQuery`/`ExtracaoDespesasBigQueryTest` (4/4 testes passando), Flow `Extracao_Despesas_Mensal` (primeiro Flow do projeto), FlexiPage/tab `Admin_Page` no aplicativo `Despesas`. A FlexiPage foi montada manualmente no Lightning App Builder (o componente `flexipage:flow`/`flowApiName` não existe — o correto é `flowruntime:interview`/`flowName`, descoberto só depois de 3 tentativas de metadata bruta falharem) e trazida pro repo via retrieve. Do lado GCP: projeto `project-fb964f4a-f81d-43d5-bb2` reaproveitado (já existia com faturamento ativo), dataset `expense_control` com tabela raw `despesas_raw` e view deduplicada `despesas_atual`, Cloud Function `extrairDespesas` (2ª geração, Node.js 22, `gcp-functions/extracao-despesas/`) deployada. `gcloud`/`bq` CLI instalados e autenticados nesta máquina pela primeira vez. Bug real encontrado e corrigido num teste ponta a ponta: `Date.format()` no Apex é sensível ao locale da org e quebrava a carga no BigQuery (que exige ISO 8601) — trocado por `String.valueOf(Date)`. Validado ponta a ponta com dado real: 124 despesas de agosto/2026 extraídas com sucesso na primeira chamada, 0 na segunda (idempotência confirmada).
 - **2026-08-23** — Adicionado o Report Type customizado `Despesas com Carteiras` (`baseObject` = `Carteira__c`, join com `Despesas__r`). Ver seção [Report Types](#report-types).
 - **2026-08-23** — Ajustado o log de observabilidade do MCP (`mcp-server/src/server.js`): o evento de `sucesso` de `criar_despesa`/`quitar_despesa` agora carrega no `detalhes` todos os campos efetivamente persistidos na `Despesa__c` naquela chamada, em vez de um resumo (`empresa`/`valor`). Ver seção [Observabilidade](#observabilidade).
 - **2026-08-14** — Adicionado o valor `Vestuário` ao Global Value Set `Tipo_Despesa`. Deploy feito na org `financeiro-dev`.
