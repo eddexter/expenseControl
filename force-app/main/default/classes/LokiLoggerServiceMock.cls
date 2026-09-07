@@ -1,17 +1,18 @@
 /**
- * Mock de callout HTTP reutilizável para testar o LokiLogger (e qualquer batch
- * que dispare um log via LokiLogger.log no finish()) sem depender do Grafana real.
+ * Mock de callout HTTP reutilizável para testar o LokiLoggerService (e
+ * qualquer classe que dispare um log via LokiLoggerService.log) sem depender
+ * do Grafana real.
  */
 @isTest
-public class LokiLoggerMock implements HttpCalloutMock {
+public class LokiLoggerServiceMock implements HttpCalloutMock {
 
     private final Integer statusCode;
 
-    public LokiLoggerMock() {
+    public LokiLoggerServiceMock() {
         this(204); // resposta padrão de sucesso do Loki push
     }
 
-    public LokiLoggerMock(Integer statusCode) {
+    public LokiLoggerServiceMock(Integer statusCode) {
         this.statusCode = statusCode;
     }
 
