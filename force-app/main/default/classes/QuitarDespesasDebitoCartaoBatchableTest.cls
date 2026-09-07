@@ -1,5 +1,5 @@
 @isTest
-private class QuitarDespesasDebitoCartaoBatchTest {
+private class QuitarDespesasDebitoCartaoBatchableTest {
 
     @TestSetup
     static void setup() {
@@ -54,9 +54,9 @@ private class QuitarDespesasDebitoCartaoBatchTest {
 
     @isTest
     static void testQuitaDebitoAutomaticoECartaoVencendoHoje() {
-        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock());
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerServiceMock());
         Test.startTest();
-        Database.executeBatch(new QuitarDespesasDebitoCartaoBatch());
+        Database.executeBatch(new QuitarDespesasDebitoCartaoBatchable());
         Test.stopTest();
 
         Map<String, Despesa__c> despesaPorDescricao = new Map<String, Despesa__c>();
@@ -75,9 +75,9 @@ private class QuitarDespesasDebitoCartaoBatchTest {
 
     @isTest
     static void testNaoQuitaOutroTipoDePagamento() {
-        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock());
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerServiceMock());
         Test.startTest();
-        Database.executeBatch(new QuitarDespesasDebitoCartaoBatch());
+        Database.executeBatch(new QuitarDespesasDebitoCartaoBatchable());
         Test.stopTest();
 
         Despesa__c boleto = [SELECT Status__c FROM Despesa__c WHERE Descricao__c = 'Boleto vencendo hoje'];
@@ -86,9 +86,9 @@ private class QuitarDespesasDebitoCartaoBatchTest {
 
     @isTest
     static void testNaoQuitaVencimentoFuturo() {
-        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock());
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerServiceMock());
         Test.startTest();
-        Database.executeBatch(new QuitarDespesasDebitoCartaoBatch());
+        Database.executeBatch(new QuitarDespesasDebitoCartaoBatchable());
         Test.stopTest();
 
         Despesa__c futura = [SELECT Status__c FROM Despesa__c WHERE Descricao__c = 'Débito Automático vencendo amanhã'];
@@ -97,9 +97,9 @@ private class QuitarDespesasDebitoCartaoBatchTest {
 
     @isTest
     static void testNaoAlteraDespesaJaPaga() {
-        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock());
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerServiceMock());
         Test.startTest();
-        Database.executeBatch(new QuitarDespesasDebitoCartaoBatch());
+        Database.executeBatch(new QuitarDespesasDebitoCartaoBatchable());
         Test.stopTest();
 
         Despesa__c jaPaga = [
@@ -110,5 +110,25 @@ private class QuitarDespesasDebitoCartaoBatchTest {
         System.assertEquals('Pago', jaPaga.Status__c);
         System.assertEquals(Date.today().addDays(-1), jaPaga.Data_Pagamento__c,
             'Data de pagamento original não deve ser sobrescrita, pois a despesa já não está Pendente');
+    }
+
+    @isTest
+    static void testSchedulableDisparaOBatch() {
+        // Chamar execute(null) direto (em vez de System.schedule) é o padrão recomendado
+        // para testar um Schedulable: um Database.executeBatch disparado de dentro de um
+        // job agendado não roda de forma síncrona/confiável dentro do mesmo
+        // Test.startTest/stopTest quando aninhado sob System.schedule.
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerServiceMock());
+        Test.startTest();
+        new QuitarDespesasDebitoCartaoSchedulable().execute(null);
+        Test.stopTest();
+
+        Despesa__c debitoAutomatico = [
+            SELECT Status__c
+            FROM Despesa__c
+            WHERE Descricao__c = 'Financiamento - Débito Automático vencendo hoje'
+        ];
+        System.assertEquals('Pago', debitoAutomatico.Status__c,
+            'QuitarDespesasDebitoCartaoSchedulable deve executar o batch e quitar a despesa');
     }
 }

@@ -1,5 +1,5 @@
 @isTest
-private class ExtracaoDespesasBigQueryTest {
+private class ExtracaoDespesasBigQueryInvocableTest {
 
     @TestSetup
     static void setup() {
@@ -37,14 +37,14 @@ private class ExtracaoDespesasBigQueryTest {
     }
 
     @isTest
-    static void testExtraiApenasDespesasDoMesEscolhidoAindaNaoExtraidas() {
-        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock(200));
+    static void testInvocableExtraiApenasDespesasDoMesEscolhidoAindaNaoExtraidas() {
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerServiceMock(200));
 
         Test.startTest();
-        ExtracaoDespesasBigQuery.ExtracaoInput input = new ExtracaoDespesasBigQuery.ExtracaoInput();
+        ExtracaoDespesasBigQueryInvocable.ExtracaoInput input = new ExtracaoDespesasBigQueryInvocable.ExtracaoInput();
         input.mesVencimento = Date.today();
-        List<ExtracaoDespesasBigQuery.ExtracaoResultado> resultados =
-            ExtracaoDespesasBigQuery.extrair(new List<ExtracaoDespesasBigQuery.ExtracaoInput>{ input });
+        List<ExtracaoDespesasBigQueryInvocable.ExtracaoResultado> resultados =
+            ExtracaoDespesasBigQueryInvocable.extrair(new List<ExtracaoDespesasBigQueryInvocable.ExtracaoInput>{ input });
         Test.stopTest();
 
         System.assertEquals(1, resultados.size());
@@ -67,11 +67,11 @@ private class ExtracaoDespesasBigQueryTest {
     }
 
     @isTest
-    static void testFalhaNoCalloutNaoMarcaComoExtraida() {
-        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock(500));
+    static void testServiceFalhaNoCalloutNaoMarcaComoExtraida() {
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerServiceMock(500));
 
         Test.startTest();
-        ExtracaoDespesasBigQuery.ExtracaoResultado resultado = ExtracaoDespesasBigQuery.extrairMes(Date.today());
+        ExtracaoDespesasBigQueryService.Resultado resultado = new ExtracaoDespesasBigQueryService().extrairMes(Date.today());
         Test.stopTest();
 
         System.assertEquals(0, resultado.quantidadeExtraida);
@@ -82,12 +82,12 @@ private class ExtracaoDespesasBigQueryTest {
     }
 
     @isTest
-    static void testMesSemDespesasPendentes() {
-        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock(200));
+    static void testServiceMesSemDespesasPendentes() {
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerServiceMock(200));
 
         Test.startTest();
-        ExtracaoDespesasBigQuery.ExtracaoResultado resultado =
-            ExtracaoDespesasBigQuery.extrairMes(Date.today().addMonths(2));
+        ExtracaoDespesasBigQueryService.Resultado resultado =
+            new ExtracaoDespesasBigQueryService().extrairMes(Date.today().addMonths(2));
         Test.stopTest();
 
         System.assertEquals(0, resultado.quantidadeExtraida);
@@ -103,7 +103,7 @@ private class ExtracaoDespesasBigQueryTest {
         Test.setMock(HttpCalloutMock.class, mock);
 
         Test.startTest();
-        ExtracaoDespesasBigQuery.extrairMes(Date.today());
+        new ExtracaoDespesasBigQueryService().extrairMes(Date.today());
         Test.stopTest();
 
         Date vencimentoEsperado = Date.newInstance(Date.today().year(), Date.today().month(), 1).addDays(9);

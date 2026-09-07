@@ -13,7 +13,7 @@
         <label>Extrair Despesas</label>
         <locationX>176</locationX>
         <locationY>242</locationY>
-        <actionName>ExtracaoDespesasBigQuery</actionName>
+        <actionName>ExtracaoDespesasBigQueryInvocable</actionName>
         <actionType>apex</actionType>
         <connector>
             <targetReference>Resultado</targetReference>

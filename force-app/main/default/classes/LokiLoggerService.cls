@@ -1,15 +1,14 @@
 /**
- * Envia eventos de observabilidade (execução de batches) para o Grafana Loki,
- * no momento em que o evento acontece — nunca por polling.
- * Ver claudeplanning/plano-observabilidade.md.
+ * Envia eventos de observabilidade para o Grafana Loki, no momento em que o
+ * evento acontece — nunca por polling. Ver claudeplanning/plano-observabilidade.md.
  *
  * Depende do Named Credential "Grafana_Loki" (protocolo Password Authentication,
  * gera o header Authorization: Basic automaticamente a partir do Instance ID /
  * Access Policy Token configurados em Setup > Named Credentials).
  *
- * Nunca lança exceção: uma falha ao logar não pode derrubar a batch que a chamou.
+ * Nunca lança exceção: uma falha ao logar não pode derrubar quem a chamou.
  */
-public without sharing class LokiLogger {
+public without sharing class LokiLoggerService {
 
     private static final String NAMED_CREDENTIAL_PATH = 'callout:Grafana_Loki/loki/api/v1/push';
 
@@ -45,7 +44,7 @@ public without sharing class LokiLogger {
 
             new Http().send(req);
         } catch (Exception e) {
-            System.debug(LoggingLevel.WARN, 'LokiLogger: falha ao enviar evento de observabilidade — ' + e.getMessage());
+            System.debug(LoggingLevel.WARN, 'LokiLoggerService: falha ao enviar evento de observabilidade — ' + e.getMessage());
         }
     }
 }

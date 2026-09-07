@@ -1,5 +1,5 @@
 @isTest
-private class CriarDespesasRecorrentesBatchTest {
+private class CriarDespesasRecorrentesBatchableTest {
 
     @TestSetup
     static void setup() {
@@ -31,9 +31,9 @@ private class CriarDespesasRecorrentesBatchTest {
     static void testCriaDespesaParaRecorrenciaAtiva() {
         Recorrencia__c rec = [SELECT Id FROM Recorrencia__c WHERE Descricao__c = 'Aluguel' LIMIT 1];
 
-        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock());
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerServiceMock());
         Test.startTest();
-        Database.executeBatch(new CriarDespesasRecorrentesBatch());
+        Database.executeBatch(new CriarDespesasRecorrentesBatchable());
         Test.stopTest();
 
         List<Despesa__c> despesas = [
@@ -59,10 +59,10 @@ private class CriarDespesasRecorrentesBatchTest {
     static void testNaoDuplicaAoRodarBatchDuasVezes() {
         Recorrencia__c rec = [SELECT Id FROM Recorrencia__c WHERE Descricao__c = 'Aluguel' LIMIT 1];
 
-        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock());
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerServiceMock());
         Test.startTest();
-        Database.executeBatch(new CriarDespesasRecorrentesBatch());
-        Database.executeBatch(new CriarDespesasRecorrentesBatch());
+        Database.executeBatch(new CriarDespesasRecorrentesBatchable());
+        Database.executeBatch(new CriarDespesasRecorrentesBatchable());
         Test.stopTest();
 
         List<Despesa__c> despesas = [SELECT Id FROM Despesa__c WHERE Recorrencia__c = :rec.Id];
@@ -73,12 +73,29 @@ private class CriarDespesasRecorrentesBatchTest {
     static void testNaoCriaDespesaParaRecorrenciaInativa() {
         Recorrencia__c rec = [SELECT Id FROM Recorrencia__c WHERE Descricao__c = 'Antiga Assinatura' LIMIT 1];
 
-        Test.setMock(HttpCalloutMock.class, new LokiLoggerMock());
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerServiceMock());
         Test.startTest();
-        Database.executeBatch(new CriarDespesasRecorrentesBatch());
+        Database.executeBatch(new CriarDespesasRecorrentesBatchable());
         Test.stopTest();
 
         List<Despesa__c> despesas = [SELECT Id FROM Despesa__c WHERE Recorrencia__c = :rec.Id];
         System.assertEquals(0, despesas.size(), 'Recorrência inativa (Data_Fim no passado) não deve gerar despesa');
+    }
+
+    @isTest
+    static void testSchedulableDisparaOBatch() {
+        Recorrencia__c rec = [SELECT Id FROM Recorrencia__c WHERE Descricao__c = 'Aluguel' LIMIT 1];
+
+        // Chamar execute(null) direto (em vez de System.schedule) é o padrão recomendado
+        // para testar um Schedulable: um Database.executeBatch disparado de dentro de um
+        // job agendado não roda de forma síncrona/confiável dentro do mesmo
+        // Test.startTest/stopTest quando aninhado sob System.schedule.
+        Test.setMock(HttpCalloutMock.class, new LokiLoggerServiceMock());
+        Test.startTest();
+        new CriarDespesasRecorrentesSchedulable().execute(null);
+        Test.stopTest();
+
+        List<Despesa__c> despesas = [SELECT Id FROM Despesa__c WHERE Recorrencia__c = :rec.Id];
+        System.assertEquals(1, despesas.size(), 'CriarDespesasRecorrentesSchedulable deve executar o batch e gerar a despesa');
     }
 }
