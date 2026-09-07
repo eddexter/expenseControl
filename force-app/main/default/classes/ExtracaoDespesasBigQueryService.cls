@@ -8,8 +8,18 @@
  * BigQueryExtracaoClient e só marca Data_Extracao__c depois de confirmar
  * sucesso (HTTP 2xx) — se o callout falhar, nada é atualizado e a próxima
  * chamada (mesmo mês) reprocessa os mesmos registros, sem duplicar e sem perder.
+ *
+ * Cada rodada envia um evento de observabilidade ao Grafana Loki
+ * (LokiLoggerService, ver claudeplanning/plano-observabilidade.md) com o
+ * resultado (sucesso/falha/sem_dados) e a quantidade de registros extraída —
+ * disparado no momento da própria extração, sem polling. O log de sucesso é
+ * enviado antes do DML que marca Data_Extracao__c: Apex não permite callout
+ * depois de DML na mesma transação.
  */
 public without sharing class ExtracaoDespesasBigQueryService {
+
+    private static final String ORIGEM_LOG = 'ExtracaoDespesasBigQueryService';
+    private static final String TIPO_EVENTO_LOG = 'extracao_despesas';
 
     public class Resultado {
         public String mensagem;
@@ -49,6 +59,7 @@ public without sharing class ExtracaoDespesasBigQueryService {
         if (despesas.isEmpty()) {
             resultado.mensagem = 'Nenhuma despesa pendente de extração em ' + primeiroDiaDoMes.format() + '.';
             resultado.quantidadeExtraida = 0;
+            logResultado('sem_dados', primeiroDiaDoMes, resultado, null);
             return resultado;
         }
 
@@ -56,20 +67,34 @@ public without sharing class ExtracaoDespesasBigQueryService {
         HttpResponse res = client.enviar(payload);
 
         if (res.getStatusCode() >= 200 && res.getStatusCode() < 300) {
+            resultado.mensagem = despesas.size() + ' despesa(s) extraída(s) com sucesso para ' + primeiroDiaDoMes.format() + '.';
+            resultado.quantidadeExtraida = despesas.size();
+            logResultado('sucesso', primeiroDiaDoMes, resultado, res);
+
             List<Despesa__c> paraAtualizar = new List<Despesa__c>();
             for (Despesa__c d : despesas) {
                 paraAtualizar.add(new Despesa__c(Id = d.Id, Data_Extracao__c = Date.today()));
             }
             despesaRepository.atualizar(paraAtualizar);
-
-            resultado.mensagem = paraAtualizar.size() + ' despesa(s) extraída(s) com sucesso para ' + primeiroDiaDoMes.format() + '.';
-            resultado.quantidadeExtraida = paraAtualizar.size();
         } else {
             resultado.mensagem = 'Falha ao extrair despesas: HTTP ' + res.getStatusCode() + ' — ' + res.getBody() +
                 '. Nenhum registro foi marcado como extraído; a próxima tentativa reprocessa o mesmo mês.';
             resultado.quantidadeExtraida = 0;
+            logResultado('falha', primeiroDiaDoMes, resultado, res);
         }
 
         return resultado;
+    }
+
+    private void logResultado(String status, Date mesReferencia, Resultado resultado, HttpResponse res) {
+        String mesReferenciaIso = String.valueOf(mesReferencia);
+        Map<String, Object> detalhes = new Map<String, Object>{
+            'mesReferencia' => mesReferenciaIso,
+            'quantidadeExtraida' => resultado.quantidadeExtraida
+        };
+        if (res != null) {
+            detalhes.put('statusHttp', res.getStatusCode());
+        }
+        LokiLoggerService.log(ORIGEM_LOG, TIPO_EVENTO_LOG, status, mesReferenciaIso, detalhes);
     }
 }

@@ -114,15 +114,106 @@ private class ExtracaoDespesasBigQueryInvocableTest {
             'Payload não deve conter datas em formato de exibição (com "/"), corpo: ' + mock.corpoCapturado);
     }
 
+    // Além do callout pro GCP, o service agora também loga o resultado no Grafana
+    // Loki (LokiLoggerService) — filtra pelo endpoint pra não deixar o corpo do
+    // log de observabilidade sobrescrever o payload de despesas capturado.
     private class CapturaRequisicaoMock implements HttpCalloutMock {
         public String corpoCapturado;
 
         public HttpResponse respond(HttpRequest req) {
-            corpoCapturado = req.getBody();
+            if (req.getEndpoint().startsWith('callout:GCP_Extracao_Despesas')) {
+                corpoCapturado = req.getBody();
+            }
             HttpResponse res = new HttpResponse();
             res.setStatusCode(200);
             res.setBody('{"ok":true}');
             return res;
+        }
+    }
+
+    @isTest
+    static void testExtracaoComSucessoEnviaLogComQuantidadeExtraida() {
+        CapturaTodasRequisicoesMock mock = new CapturaTodasRequisicoesMock();
+        Test.setMock(HttpCalloutMock.class, mock);
+
+        Test.startTest();
+        new ExtracaoDespesasBigQueryService().extrairMes(Date.today());
+        Test.stopTest();
+
+        HttpRequest logRequest = mock.requisicaoParaEndpoint('Grafana_Loki');
+        System.assertNotEquals(null, logRequest, 'Extração com sucesso deve enviar um evento de log ao Grafana Loki');
+        // A linha do Loki vai como JSON serializado dentro do campo "values" (LokiLoggerService),
+        // por isso as aspas internas chegam escapadas (\") no corpo da requisição.
+        System.assert(logRequest.getBody().contains('\\"status\\":\\"sucesso\\"'),
+            'Log deve reportar status de sucesso, corpo: ' + logRequest.getBody());
+        System.assert(logRequest.getBody().contains('\\"quantidadeExtraida\\":1'),
+            'Log deve reportar a quantidade de despesas extraídas, corpo: ' + logRequest.getBody());
+    }
+
+    @isTest
+    static void testExtracaoSemDespesasPendentesEnviaLogComoSemDados() {
+        CapturaTodasRequisicoesMock mock = new CapturaTodasRequisicoesMock();
+        Test.setMock(HttpCalloutMock.class, mock);
+
+        Test.startTest();
+        new ExtracaoDespesasBigQueryService().extrairMes(Date.today().addMonths(2));
+        Test.stopTest();
+
+        HttpRequest logRequest = mock.requisicaoParaEndpoint('Grafana_Loki');
+        System.assertNotEquals(null, logRequest, 'Mês sem despesas pendentes deve enviar um evento de log ao Grafana Loki');
+        System.assert(logRequest.getBody().contains('\\"status\\":\\"sem_dados\\"'),
+            'Log deve reportar status de sem_dados, corpo: ' + logRequest.getBody());
+        System.assert(logRequest.getBody().contains('\\"quantidadeExtraida\\":0'),
+            'Log deve reportar quantidade zero, corpo: ' + logRequest.getBody());
+    }
+
+    @isTest
+    static void testExtracaoComFalhaNoCalloutEnviaLogComoFalha() {
+        CapturaTodasRequisicoesMock mock = new CapturaTodasRequisicoesMock(500);
+        Test.setMock(HttpCalloutMock.class, mock);
+
+        Test.startTest();
+        new ExtracaoDespesasBigQueryService().extrairMes(Date.today());
+        Test.stopTest();
+
+        HttpRequest logRequest = mock.requisicaoParaEndpoint('Grafana_Loki');
+        System.assertNotEquals(null, logRequest, 'Falha no callout deve enviar um evento de log ao Grafana Loki');
+        System.assert(logRequest.getBody().contains('\\"status\\":\\"falha\\"'),
+            'Log deve reportar status de falha, corpo: ' + logRequest.getBody());
+        System.assert(logRequest.getBody().contains('\\"quantidadeExtraida\\":0'),
+            'Log deve reportar quantidade zero quando o callout falha, corpo: ' + logRequest.getBody());
+    }
+
+    // Mock genérico que responde ao mesmo status para qualquer endpoint (GCP ou
+    // Grafana Loki) e guarda todas as requisições feitas na transação, pra
+    // permitir inspecionar especificamente o evento enviado ao Loki.
+    private class CapturaTodasRequisicoesMock implements HttpCalloutMock {
+        private final Integer statusCode;
+        private final List<HttpRequest> requisicoes = new List<HttpRequest>();
+
+        CapturaTodasRequisicoesMock() {
+            this(200);
+        }
+
+        CapturaTodasRequisicoesMock(Integer statusCode) {
+            this.statusCode = statusCode;
+        }
+
+        public HttpResponse respond(HttpRequest req) {
+            requisicoes.add(req);
+            HttpResponse res = new HttpResponse();
+            res.setStatusCode(statusCode);
+            res.setBody(statusCode < 300 ? '{"ok":true}' : '{"error":"mock"}');
+            return res;
+        }
+
+        HttpRequest requisicaoParaEndpoint(String trechoDoEndpoint) {
+            for (HttpRequest req : requisicoes) {
+                if (req.getEndpoint().contains(trechoDoEndpoint)) {
+                    return req;
+                }
+            }
+            return null;
         }
     }
 }
