@@ -36,6 +36,11 @@
         <label>Concessionárias</label>
     </customValue>
     <customValue>
+        <fullName>Decoração</fullName>
+        <default>false</default>
+        <label>Decoração</label>
+    </customValue>
+    <customValue>
         <fullName>Educação</fullName>
         <default>false</default>
         <label>Educação</label>
