@@ -2,9 +2,10 @@
  * Orquestra a extração sob demanda de Despesa__c para o BigQuery (MVP4). Ver
  * claudeplanning/plano-extracao-mvp4.md.
  *
- * Busca despesas ainda não extraídas (Data_Extracao__c = null) com
- * Data_Vencimento__c dentro do mês escolhido (DespesaRepository +
- * DespesaFilter), monta o payload (DespesaExtracaoPayloadBuilder), envia via
+ * Busca despesas pagas (Status__c = 'Pago') ainda não extraídas
+ * (Data_Extracao__c = null) com Data_Vencimento__c dentro do mês escolhido
+ * (DespesaRepository + DespesaFilter), monta o payload
+ * (DespesaExtracaoPayloadBuilder), envia via
  * BigQueryExtracaoClient e só marca Data_Extracao__c depois de confirmar
  * sucesso (HTTP 2xx) — se o callout falhar, nada é atualizado e a próxima
  * chamada (mesmo mês) reprocessa os mesmos registros, sem duplicar e sem perder.
@@ -52,6 +53,7 @@ public without sharing class ExtracaoDespesasBigQueryService {
 
         DespesaFilter filtro = new DespesaFilter()
             .semDataExtracao()
+            .comStatus('Pago')
             .comDataVencimentoEntre(primeiroDiaDoMes, ultimoDiaDoMes);
 
         List<Despesa__c> despesas = despesaRepository.buscarParaExtracao(filtro);

@@ -48,17 +48,6 @@ function errorResult(message) {
   return { content: [{ type: 'text', text: `Erro: ${message}` }], isError: true };
 }
 
-// Resultado de prévia: usado por criar_despesa/quitar_despesa/editar_despesa quando
-// confirmar !== true. Nada é persistido — só devolve os campos que seriam gravados,
-// para o Claude mostrar ao usuário antes de chamar a ferramenta de novo com confirmar = true.
-function previewResult(payload) {
-  return textResult({
-    confirmacaoNecessaria: true,
-    mensagem: 'Nada foi salvo ainda. Confira os campos abaixo com o usuário e chame esta ferramenta novamente com confirmar = true para gravar.',
-    ...payload
-  });
-}
-
 export function createServer() {
   const server = new McpServer({ name: 'despesas-mcp-server', version: '1.0.0' });
 
@@ -160,16 +149,15 @@ export function createServer() {
         'Se valorPago for informado e a despesa NÃO for variável, o valor deve bater com Valor__c (pequenas diferenças de arredondamento são toleradas); divergências maiores exigem forcar = true. ' +
         'Se a despesa já não estiver Pendente, também exige forcar = true. ' +
         'Se Tipo_Pagamento__c for Débito Automático ou Cartão de Crédito, a baixa é tipicamente automática por outro mecanismo — confirme com o usuário antes de quitar manualmente; passe forcar = true só após essa confirmação. ' +
-        'Além disso, sem confirmar = true a ferramenta NÃO grava nada — retorna uma prévia dos campos que seriam gravados. Sempre mostre essa prévia ao usuário e só chame de novo com confirmar = true depois que ele confirmar os dados.',
+        'Esta ferramenta grava direto no Salesforce ao ser chamada — se houver qualquer dúvida sobre os dados (despesa certa, valor, data), confirme com o usuário antes de chamar.',
       inputSchema: {
         despesaId: z.string().describe('Id do registro Despesa__c a ser quitado'),
         dataPagamento: z.string().describe('Data em que o pagamento foi efetuado, no formato YYYY-MM-DD'),
         valorPago: z.number().optional().describe('Valor efetivamente pago, se diferente do valor cadastrado'),
-        forcar: z.boolean().optional().describe('Ignora as validações de segurança (status atual, divergência de valor e tipo de pagamento Débito Automático/Cartão de Crédito)'),
-        confirmar: z.boolean().optional().describe('Só grava a quitação quando true. Sem isso, retorna uma prévia dos campos para o usuário conferir antes de persistir.')
+        forcar: z.boolean().optional().describe('Ignora as validações de segurança (status atual, divergência de valor e tipo de pagamento Débito Automático/Cartão de Crédito)')
       }
     },
-    async ({ despesaId, dataPagamento, valorPago, forcar, confirmar }) => {
+    async ({ despesaId, dataPagamento, valorPago, forcar }) => {
       try {
         const [despesa] = await querySOQL(
           `SELECT Id, Status__c, Variavel__c, Valor__c, Empresa__c, Descricao__c, Tipo_Pagamento__c FROM Despesa__c WHERE Id = '${soqlEscape(despesaId)}' LIMIT 1`
@@ -206,15 +194,6 @@ export function createServer() {
           if (diff > 0.01) {
             fields.Valor__c = valorPago;
           }
-        }
-
-        if (!confirmar) {
-          return previewResult({
-            despesaId: despesa.Id,
-            empresa: despesa.Empresa__c,
-            descricao: despesa.Descricao__c,
-            camposAPersistir: fields
-          });
         }
 
         await updateRecord('Despesa__c', despesa.Id, fields);
@@ -284,7 +263,7 @@ export function createServer() {
         'A despesa é criada diretamente com Status__c = Pago e Data_Pagamento__c = dataPagamento, já que o comprovante prova que o pagamento já ocorreu. ' +
         'Antes de usar esta ferramenta, chame identificar_despesa_por_comprovante para conferir se o comprovante não corresponde a uma despesa pendente já existente (ex: gerada por uma recorrência) — só crie uma despesa nova quando não houver correspondência razoável. ' +
         'carteiraId NUNCA deve ser adivinhado: se o comprovante for de Débito ou Pix, chame buscar_carteiras com tipo = "Conta Corrente" e pergunte ao usuário qual conta corrente cadastrada usar; se for de Cartão de Crédito, chame buscar_carteiras com tipo = "Cartão de Crédito" e pergunte qual cartão cadastrado usar — mesmo havendo só uma opção, confirme com o usuário antes de criar a despesa. ' +
-        'Sem confirmar = true a ferramenta NÃO grava nada — retorna uma prévia dos campos que seriam gravados. Sempre mostre essa prévia ao usuário (incluindo o Tipo__c escolhido, fonte comum de erro de categorização) e só chame de novo com confirmar = true depois que ele confirmar os dados.',
+        'Esta ferramenta grava direto no Salesforce ao ser chamada — se houver qualquer dúvida sobre os dados (Tipo__c escolhido, fonte comum de erro de categorização; valor; empresa), confirme com o usuário antes de chamar.',
       inputSchema: {
         descricao: z.string().describe('Descrição da despesa'),
         valor: z.number().describe('Valor pago, conforme o comprovante'),
@@ -298,11 +277,10 @@ export function createServer() {
         tipoPagamento: z.string().optional().describe('Tipo_Pagamento__c: Boleto, Débito Automático, Pix ou Cartão de Crédito'),
         empresa: z.string().optional().describe('Nome da empresa/beneficiário como aparece no comprovante'),
         observacoes: z.string().optional().describe('Observações livres sobre a despesa'),
-        variavel: z.boolean().optional().describe('Variavel__c — se o valor costuma variar (padrão false)'),
-        confirmar: z.boolean().optional().describe('Só grava a despesa quando true. Sem isso, retorna uma prévia dos campos para o usuário conferir antes de persistir.')
+        variavel: z.boolean().optional().describe('Variavel__c — se o valor costuma variar (padrão false)')
       }
     },
-    async ({ descricao, valor, carteiraId, dataPagamento, dataVencimento, tipo, tipoPagamento, empresa, observacoes, variavel, confirmar }) => {
+    async ({ descricao, valor, carteiraId, dataPagamento, dataVencimento, tipo, tipoPagamento, empresa, observacoes, variavel }) => {
       try {
         const fields = {
           Descricao__c: descricao,
@@ -317,10 +295,6 @@ export function createServer() {
         if (empresa) fields.Empresa__c = empresa;
         if (observacoes) fields.Observacoes__c = observacoes;
         if (variavel != null) fields.Variavel__c = variavel;
-
-        if (!confirmar) {
-          return previewResult({ camposAPersistir: fields });
-        }
 
         const despesaId = await createRecord('Despesa__c', fields);
 
@@ -345,8 +319,7 @@ export function createServer() {
       description:
         'Corrige um ou mais campos de uma Despesa__c já existente — use quando o usuário apontar que um campo foi cadastrado errado, por exemplo Tipo__c mal categorizado ao criar uma despesa avulsa. ' +
         'Informe só os campos que devem mudar; os demais permanecem como estão. ' +
-        'Sem confirmar = true a ferramenta NÃO grava nada — retorna uma prévia (valor atual x valor novo) de cada campo para o usuário conferir. ' +
-        'Sempre mostre essa prévia ao usuário e só chame de novo com confirmar = true depois que ele confirmar explicitamente as alterações.',
+        'Esta ferramenta grava direto no Salesforce ao ser chamada — se houver qualquer dúvida sobre a despesa certa ou o valor novo de algum campo, confirme com o usuário antes de chamar.',
       inputSchema: {
         despesaId: z.string().describe('Id do registro Despesa__c a editar'),
         descricao: z.string().optional().describe('Novo valor de Descricao__c'),
@@ -359,11 +332,10 @@ export function createServer() {
         tipoPagamento: z.string().optional().describe('Novo Tipo_Pagamento__c: Boleto, Débito Automático, Débito, Pix ou Cartão de Crédito'),
         empresa: z.string().optional().describe('Novo Empresa__c'),
         observacoes: z.string().optional().describe('Novo Observacoes__c'),
-        variavel: z.boolean().optional().describe('Novo Variavel__c'),
-        confirmar: z.boolean().optional().describe('Só grava as alterações quando true. Sem isso, retorna uma prévia (atual x novo) para o usuário conferir antes de persistir.')
+        variavel: z.boolean().optional().describe('Novo Variavel__c')
       }
     },
-    async ({ despesaId, confirmar, ...campos }) => {
+    async ({ despesaId, ...campos }) => {
       try {
         const entradas = Object.entries(CAMPOS_EDITAVEIS_DESPESA).filter(([chave]) => campos[chave] !== undefined);
         if (entradas.length === 0) {
@@ -382,14 +354,6 @@ export function createServer() {
           valorAtual: despesa[apiName] ?? null,
           valorNovo: campos[chave]
         }));
-
-        if (!confirmar) {
-          return previewResult({
-            despesaId: despesa.Id,
-            descricaoAtual: despesa.Descricao__c,
-            alteracoes
-          });
-        }
 
         const fields = Object.fromEntries(alteracoes.map((a) => [a.campo, a.valorNovo]));
         await updateRecord('Despesa__c', despesa.Id, fields);
