@@ -14,14 +14,16 @@ private class ExtracaoDespesasBigQueryInvocableTest {
                 Descricao__c = 'Aluguel mes atual',
                 Valor__c = 1500,
                 Data_Vencimento__c = primeiroDiaMesAtual.addDays(9),
-                Status__c = 'Pendente',
+                Status__c = 'Pago',
+                Data_Pagamento__c = primeiroDiaMesAtual.addDays(9),
                 Carteira__c = carteira.Id
             ),
             new Despesa__c(
                 Descricao__c = 'Aluguel mes seguinte',
                 Valor__c = 1500,
                 Data_Vencimento__c = primeiroDiaProximoMes.addDays(9),
-                Status__c = 'Pendente',
+                Status__c = 'Pago',
+                Data_Pagamento__c = primeiroDiaProximoMes.addDays(9),
                 Carteira__c = carteira.Id
             ),
             new Despesa__c(
@@ -31,6 +33,13 @@ private class ExtracaoDespesasBigQueryInvocableTest {
                 Status__c = 'Pago',
                 Data_Pagamento__c = primeiroDiaMesAtual.addDays(14),
                 Data_Extracao__c = Date.today().addDays(-1),
+                Carteira__c = carteira.Id
+            ),
+            new Despesa__c(
+                Descricao__c = 'Agua mes atual - ainda pendente',
+                Valor__c = 80,
+                Data_Vencimento__c = primeiroDiaMesAtual.addDays(20),
+                Status__c = 'Pendente',
                 Carteira__c = carteira.Id
             )
         };
@@ -64,6 +73,10 @@ private class ExtracaoDespesasBigQueryInvocableTest {
         ];
         System.assertEquals(Date.today().addDays(-1), internetJaExtraida.Data_Extracao__c,
             'Despesa já extraída não deve ser reprocessada nem ter a data sobrescrita');
+
+        Despesa__c aguaPendente = [SELECT Data_Extracao__c FROM Despesa__c WHERE Descricao__c = 'Agua mes atual - ainda pendente'];
+        System.assertEquals(null, aguaPendente.Data_Extracao__c,
+            'Despesa ainda pendente (não paga) não deve ser extraída');
     }
 
     @isTest
