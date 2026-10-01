@@ -81,6 +81,11 @@
         <label>Saúde</label>
     </customValue>
     <customValue>
+        <fullName>Trabalho</fullName>
+        <default>false</default>
+        <label>Trabalho</label>
+    </customValue>
+    <customValue>
         <fullName>Transporte</fullName>
         <default>false</default>
         <label>Transporte</label>

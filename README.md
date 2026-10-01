@@ -36,7 +36,7 @@ Modelo de uma despesa que se repete mensalmente (ex: aluguel, assinaturas). O ba
 | Data_Fim__c | Date | Não | Fim da vigência (em branco = sem data de término) |
 | Ativa__c | Checkbox (fórmula) | — | `Data_Inicio__c <= HOJE() && (Data_Fim__c em branco OU Data_Fim__c >= HOJE())` |
 | Carteira_Padrao__c | Lookup(Carteira__c) | Sim | Carteira usada por padrão ao gerar a despesa |
-| Tipo__c | Picklist (Global Value Set `Tipo_Despesa`) | Não | Ações Sociais, Alimentação, Assinaturas, Beleza, Combustível, Compras, Concessionárias, Educação, Fatura de Cartão, Hospedagem, Impostos, Investimentos, Lazer, Moradia, Saúde, Transporte, Vestuário, Viagem, Outros |
+| Tipo__c | Picklist (Global Value Set `Tipo_Despesa`) | Não | Ações Sociais, Alimentação, Assinaturas, Beleza, Combustível, Compras, Concessionárias, Educação, Fatura de Cartão, Hospedagem, Impostos, Investimentos, Lazer, Moradia, Saúde, Trabalho, Transporte, Vestuário, Viagem, Outros |
 | Tipo_Pagamento__c | Picklist | Não | Boleto, Débito Automático, Débito, Pix, Cartão de Crédito |
 | Variavel__c | Checkbox | — | Default `false`. Indica se o valor pode variar de um mês para outro (ex: cartão de crédito, conta de luz) |
 | Empresa__c | Text(120) | Não | Nome da empresa como aparece no recibo/comprovante, para facilitar identificação via MCP |
@@ -332,6 +332,7 @@ sf apex run test --target-org <alias> --class-names CriarDespesasRecorrentesBatc
 
 ## Histórico de mudanças
 
+- **2026-10-01** — Adicionado o valor `Trabalho` ao Global Value Set `Tipo_Despesa`. Deploy feito na org `financeiro-dev`.
 - **2026-09-21** — A extração para o BigQuery (`ExtracaoDespesasBigQueryService.extrairMes()`) agora só considera despesas pagas (`Status__c = 'Pago'`), além dos filtros já existentes (`Data_Extracao__c = null` + `Data_Vencimento__c` no mês escolhido) — despesas `Pendente`/`Cancelado` deixam de ser extraídas. Ver seção [Extração para BigQuery (MVP4)](#extração-para-bigquery-mvp4). Deploy e 32/32 testes passando na org `financeiro-dev`.
 - **2026-09-16** — Removido o parâmetro `confirmar` (e o mecanismo de prévia associado) de `criar_despesa`, `quitar_despesa` e `editar_despesa` no `mcp-server`: as três ferramentas voltaram a gravar direto no Salesforce assim que chamadas, sem um passo obrigatório de confirmação no protocolo. A confirmação com o usuário antes de gravar fica a critério do Claude — as descrições das ferramentas agora orientam a perguntar apenas quando houver dúvida real sobre os dados (categorização, carteira, valor, despesa certa), em vez de forçar sempre um ciclo prévia→confirmação. Ver seção [Integração MCP customizada](#integração-mcp-customizada-conciliação-de-comprovantes).
 - **2026-09-16** — Adicionado o valor `Decoração` ao Global Value Set `Tipo_Despesa` (`Viagem`, também pedido junto, já existia desde 2026-08-11). Deploy feito na org `financeiro-dev`.
