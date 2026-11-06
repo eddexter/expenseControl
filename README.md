@@ -157,13 +157,15 @@ Cada objeto tem uma list view `Todos` (`filterScope: Everything`, sem filtros �
 - **Recorrencia__c**: Name, Descricao__c, Valor__c, Tipo__c, Empresa__c, Variavel__c, Carteira_Padrao__c, Dia_Vencimento__c, Ativa__c, Tipo_Pagamento__c
 - **Despesa__c**: Name, Descricao__c, Valor__c, Tipo__c, Status__c, Data_Vencimento__c, Data_Pagamento__c, Carteira__c, Tipo_Pagamento__c
 
-`Despesa__c` também tem 5 list views focadas em acompanhamento mensal (filtros combinados com AND):
+`Despesa__c` também tem 7 list views filtradas (filtros combinados com AND) — 5 focadas em acompanhamento mensal e 2 gerais por status, sem recorte de data:
 
 - **Despesas Abertas do Mês** (`Despesas_Abertas_do_Mes`): `Status__c = 'Pendente'` E `Data_Vencimento__c` no mês corrente (`THIS_MONTH`).
 - **Despesas Pagas do Mês** (`Despesas_Pagas_do_Mes`): `Status__c = 'Pago'` E `Data_Pagamento__c` no mês corrente (`THIS_MONTH`).
 - **Atrasados** (`Atrasados`): `Status__c = 'Pendente'` E `Data_Vencimento__c < TODAY`.
 - **Despesas Pagas no Crédito no Mês** (`DespesasPagasCreditoMes`): `Status__c = 'Pago'` E `Data_Pagamento__c` no mês corrente (`THIS_MONTH`) E `Tipo_Pagamento__c = 'Cartão de Crédito'`.
 - **Despesas Abertas Manuais** (`Despesas_Abertas_Manuais`): `Status__c = 'Pendente'` E `Data_Vencimento__c` no mês corrente (`THIS_MONTH`) E `Tipo_Pagamento__c` em `Boleto, Pix, Débito` (formas de pagamento manuais, sem cartão de crédito).
+- **Despesas Abertas** (`Despesas_Abertas`): `Status__c = 'Pendente'` (todas as datas). Colunas: Name, Descricao__c, Valor__c, Tipo__c, Status__c, Data_Vencimento__c, Carteira__c, Tipo_Pagamento__c.
+- **Despesas Pagas** (`Despesas_Pagas`): `Status__c = 'Pago'` (todas as datas). Colunas: as mesmas de `Despesas Abertas` + Data_Pagamento__c.
 
 A list view nativa "Recent" (Mais Recentes) **não é gerenciável via Metadata API** (não é retornada por `list metadata`, nem por retrieve explícito, para nenhum objeto padrão ou customizado) — não é possível versioná-la ou definir suas colunas via pacote. Decisão: não mexer nela; `Todos` é a visão principal usada no app.
 
@@ -332,6 +334,7 @@ sf apex run test --target-org <alias> --class-names CriarDespesasRecorrentesBatc
 
 ## Histórico de mudanças
 
+- **2026-11-05** — Trazidas para o repo, via `sf project retrieve start`, 2 list views de `Despesa__c` criadas no Setup da org `financeiro-dev` em 2026-11-01: `Despesas Abertas` (`Despesas_Abertas`: `Status__c = 'Pendente'`) e `Despesas Pagas` (`Despesas_Pagas`: `Status__c = 'Pago'`), ambas sem filtro de data. O retrieve também marcou como alteradas as list views já versionadas, mas era só reordenação de elementos no XML (sem mudança de colunas/filtros) — descartado. Ver seção [List Views](#list-views).
 - **2026-10-01** — Adicionado o valor `Trabalho` ao Global Value Set `Tipo_Despesa`. Deploy feito na org `financeiro-dev`.
 - **2026-09-21** — A extração para o BigQuery (`ExtracaoDespesasBigQueryService.extrairMes()`) agora só considera despesas pagas (`Status__c = 'Pago'`), além dos filtros já existentes (`Data_Extracao__c = null` + `Data_Vencimento__c` no mês escolhido) — despesas `Pendente`/`Cancelado` deixam de ser extraídas. Ver seção [Extração para BigQuery (MVP4)](#extração-para-bigquery-mvp4). Deploy e 32/32 testes passando na org `financeiro-dev`.
 - **2026-09-16** — Removido o parâmetro `confirmar` (e o mecanismo de prévia associado) de `criar_despesa`, `quitar_despesa` e `editar_despesa` no `mcp-server`: as três ferramentas voltaram a gravar direto no Salesforce assim que chamadas, sem um passo obrigatório de confirmação no protocolo. A confirmação com o usuário antes de gravar fica a critério do Claude — as descrições das ferramentas agora orientam a perguntar apenas quando houver dúvida real sobre os dados (categorização, carteira, valor, despesa certa), em vez de forçar sempre um ciclo prévia→confirmação. Ver seção [Integração MCP customizada](#integração-mcp-customizada-conciliação-de-comprovantes).
