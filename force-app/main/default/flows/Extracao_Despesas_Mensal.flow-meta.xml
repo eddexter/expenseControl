@@ -6,7 +6,7 @@
     <processType>Flow</processType>
     <status>Active</status>
 
-    <description>Tela de Admin (MVP4): o admin escolhe o mês de vencimento e dispara a extração sob demanda de Despesa__c para o BigQuery. Ver claudeplanning/plano-extracao-mvp4.md.</description>
+    <description>Tela de Admin (MVP4): o admin escolhe o mês de pagamento e dispara a extração sob demanda de Despesa__c para o BigQuery. Ver claudeplanning/plano-extracao-mvp4.md.</description>
 
     <actionCalls>
         <name>Extrair_Despesas</name>
@@ -19,9 +19,9 @@
             <targetReference>Resultado</targetReference>
         </connector>
         <inputParameters>
-            <name>mesVencimento</name>
+            <name>mesPagamento</name>
             <value>
-                <elementReference>mesVencimentoInput</elementReference>
+                <elementReference>mesPagamentoInput</elementReference>
             </value>
         </inputParameters>
         <outputParameters>
@@ -42,9 +42,9 @@
             <targetReference>Extrair_Despesas</targetReference>
         </connector>
         <fields>
-            <name>mesVencimentoInput</name>
+            <name>mesPagamentoInput</name>
             <dataType>Date</dataType>
-            <fieldText>Mês de vencimento a extrair (qualquer dia dentro do mês desejado)</fieldText>
+            <fieldText>Mês de pagamento a extrair (qualquer dia dentro do mês desejado)</fieldText>
             <fieldType>InputField</fieldType>
             <isRequired>true</isRequired>
         </fields>
