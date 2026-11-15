@@ -30,6 +30,16 @@ private class DespesaFilterTest {
     }
 
     @isTest
+    static void testDataPagamentoEntreViraIntervaloFechado() {
+        Date de = Date.newInstance(2026, 9, 1);
+        Date ate = Date.newInstance(2026, 9, 30);
+
+        String clausula = new DespesaFilter().comDataPagamentoEntre(de, ate).toSoqlWhere();
+
+        System.assertEquals('Data_Pagamento__c >= 2026-09-01 AND Data_Pagamento__c <= 2026-09-30', clausula);
+    }
+
+    @isTest
     static void testTiposPagamentoViraClausulaIn() {
         String clausula = new DespesaFilter()
             .comTiposPagamento(new List<String>{ 'Débito Automático', 'Cartão de Crédito' })

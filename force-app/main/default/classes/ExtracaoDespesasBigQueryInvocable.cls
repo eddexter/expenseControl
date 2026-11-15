@@ -6,8 +6,8 @@
 public without sharing class ExtracaoDespesasBigQueryInvocable {
 
     public class ExtracaoInput {
-        @InvocableVariable(label='Mês de vencimento' required=true description='Qualquer data dentro do mês/ano a extrair — só o mês e o ano são usados.')
-        public Date mesVencimento;
+        @InvocableVariable(label='Mês de pagamento' required=true description='Qualquer data dentro do mês/ano a extrair — só o mês e o ano são usados.')
+        public Date mesPagamento;
     }
 
     public class ExtracaoResultado {
@@ -22,7 +22,7 @@ public without sharing class ExtracaoDespesasBigQueryInvocable {
     public static List<ExtracaoResultado> extrair(List<ExtracaoInput> inputs) {
         List<ExtracaoResultado> resultados = new List<ExtracaoResultado>();
         for (ExtracaoInput input : inputs) {
-            ExtracaoDespesasBigQueryService.Resultado origem = new ExtracaoDespesasBigQueryService().extrairMes(input.mesVencimento);
+            ExtracaoDespesasBigQueryService.Resultado origem = new ExtracaoDespesasBigQueryService().extrairMes(input.mesPagamento);
             resultados.add(paraResultadoDoFlow(origem));
         }
         return resultados;

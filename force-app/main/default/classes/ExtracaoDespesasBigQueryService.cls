@@ -3,7 +3,7 @@
  * claudeplanning/plano-extracao-mvp4.md.
  *
  * Busca despesas pagas (Status__c = 'Pago') ainda não extraídas
- * (Data_Extracao__c = null) com Data_Vencimento__c dentro do mês escolhido
+ * (Data_Extracao__c = null) com Data_Pagamento__c dentro do mês escolhido
  * (DespesaRepository + DespesaFilter), monta o payload
  * (DespesaExtracaoPayloadBuilder), envia via
  * BigQueryExtracaoClient e só marca Data_Extracao__c depois de confirmar
@@ -45,16 +45,16 @@ public without sharing class ExtracaoDespesasBigQueryService {
         this.client = client;
     }
 
-    public Resultado extrairMes(Date mesVencimento) {
+    public Resultado extrairMes(Date mesPagamento) {
         Resultado resultado = new Resultado();
 
-        Date primeiroDiaDoMes = Date.newInstance(mesVencimento.year(), mesVencimento.month(), 1);
+        Date primeiroDiaDoMes = Date.newInstance(mesPagamento.year(), mesPagamento.month(), 1);
         Date ultimoDiaDoMes = primeiroDiaDoMes.addMonths(1).addDays(-1);
 
         DespesaFilter filtro = new DespesaFilter()
             .semDataExtracao()
             .comStatus('Pago')
-            .comDataVencimentoEntre(primeiroDiaDoMes, ultimoDiaDoMes);
+            .comDataPagamentoEntre(primeiroDiaDoMes, ultimoDiaDoMes);
 
         List<Despesa__c> despesas = despesaRepository.buscarParaExtracao(filtro);
 

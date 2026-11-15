@@ -19,9 +19,9 @@ private class ExtracaoDespesasBigQueryInvocableTest {
                 Carteira__c = carteira.Id
             ),
             new Despesa__c(
-                Descricao__c = 'Aluguel mes seguinte',
+                Descricao__c = 'Aluguel pago no mes seguinte',
                 Valor__c = 1500,
-                Data_Vencimento__c = primeiroDiaProximoMes.addDays(9),
+                Data_Vencimento__c = primeiroDiaMesAtual.addDays(9),
                 Status__c = 'Pago',
                 Data_Pagamento__c = primeiroDiaProximoMes.addDays(9),
                 Carteira__c = carteira.Id
@@ -46,12 +46,12 @@ private class ExtracaoDespesasBigQueryInvocableTest {
     }
 
     @isTest
-    static void testInvocableExtraiApenasDespesasDoMesEscolhidoAindaNaoExtraidas() {
+    static void testInvocableExtraiApenasDespesasPagasNoMesEscolhidoAindaNaoExtraidas() {
         Test.setMock(HttpCalloutMock.class, new LokiLoggerServiceMock(200));
 
         Test.startTest();
         ExtracaoDespesasBigQueryInvocable.ExtracaoInput input = new ExtracaoDespesasBigQueryInvocable.ExtracaoInput();
-        input.mesVencimento = Date.today();
+        input.mesPagamento = Date.today();
         List<ExtracaoDespesasBigQueryInvocable.ExtracaoResultado> resultados =
             ExtracaoDespesasBigQueryInvocable.extrair(new List<ExtracaoDespesasBigQueryInvocable.ExtracaoInput>{ input });
         Test.stopTest();
@@ -63,8 +63,9 @@ private class ExtracaoDespesasBigQueryInvocableTest {
         Despesa__c aluguelMesAtual = [SELECT Data_Extracao__c FROM Despesa__c WHERE Descricao__c = 'Aluguel mes atual'];
         System.assertEquals(Date.today(), aluguelMesAtual.Data_Extracao__c);
 
-        Despesa__c aluguelMesSeguinte = [SELECT Data_Extracao__c FROM Despesa__c WHERE Descricao__c = 'Aluguel mes seguinte'];
-        System.assertEquals(null, aluguelMesSeguinte.Data_Extracao__c, 'Despesa de outro mês não deve ser tocada');
+        Despesa__c aluguelPagoMesSeguinte = [SELECT Data_Extracao__c FROM Despesa__c WHERE Descricao__c = 'Aluguel pago no mes seguinte'];
+        System.assertEquals(null, aluguelPagoMesSeguinte.Data_Extracao__c,
+            'Despesa paga em outro mês não deve ser tocada, mesmo com vencimento no mês escolhido');
 
         Despesa__c internetJaExtraida = [
             SELECT Data_Extracao__c

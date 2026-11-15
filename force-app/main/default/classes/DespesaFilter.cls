@@ -16,6 +16,8 @@ public class DespesaFilter {
     private Date dataVencimentoIgual;
     private Date dataVencimentoDe;
     private Date dataVencimentoAte;
+    private Date dataPagamentoDe;
+    private Date dataPagamentoAte;
     private List<String> tiposPagamento;
     private Set<Id> recorrenciaIds;
     private Boolean semDataExtracao;
@@ -33,6 +35,12 @@ public class DespesaFilter {
     public DespesaFilter comDataVencimentoEntre(Date de, Date ate) {
         this.dataVencimentoDe = de;
         this.dataVencimentoAte = ate;
+        return this;
+    }
+
+    public DespesaFilter comDataPagamentoEntre(Date de, Date ate) {
+        this.dataPagamentoDe = de;
+        this.dataPagamentoAte = ate;
         return this;
     }
 
@@ -65,6 +73,12 @@ public class DespesaFilter {
         }
         if (dataVencimentoAte != null) {
             condicoes.add('Data_Vencimento__c <= ' + String.valueOf(dataVencimentoAte));
+        }
+        if (dataPagamentoDe != null) {
+            condicoes.add('Data_Pagamento__c >= ' + String.valueOf(dataPagamentoDe));
+        }
+        if (dataPagamentoAte != null) {
+            condicoes.add('Data_Pagamento__c <= ' + String.valueOf(dataPagamentoAte));
         }
         if (tiposPagamento != null && !tiposPagamento.isEmpty()) {
             List<String> tiposEntreAspas = new List<String>();
